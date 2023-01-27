@@ -175,8 +175,8 @@
                 else {
                     text = text || '';
                     font = font || DEFAULT_FONT;
-                    var res = /^([0-9]*?)px$/.exec(font);
-                    var fontSize = +(res && res[1]) || DEFAULT_FONT_SIZE;
+                    var res = /(\d+)px/.exec(font);
+                    var fontSize = res && +res[1] || DEFAULT_FONT_SIZE;
                     var width = 0;
                     if (font.indexOf('mono') >= 0) {
                         width = fontSize * text.length;
@@ -629,11 +629,48 @@
     function isPrimitive(obj) {
         return obj[primitiveKey];
     }
+    var MapPolyfill = (function () {
+        function MapPolyfill() {
+            this.data = {};
+        }
+        MapPolyfill.prototype["delete"] = function (key) {
+            var existed = this.has(key);
+            if (existed) {
+                delete this.data[key];
+            }
+            return existed;
+        };
+        MapPolyfill.prototype.has = function (key) {
+            return this.data.hasOwnProperty(key);
+        };
+        MapPolyfill.prototype.get = function (key) {
+            return this.data[key];
+        };
+        MapPolyfill.prototype.set = function (key, value) {
+            this.data[key] = value;
+            return this;
+        };
+        MapPolyfill.prototype.keys = function () {
+            return keys(this.data);
+        };
+        MapPolyfill.prototype.forEach = function (callback) {
+            var data = this.data;
+            for (var key in data) {
+                if (data.hasOwnProperty(key)) {
+                    callback(data[key], key);
+                }
+            }
+        };
+        return MapPolyfill;
+    }());
+    var isNativeMapSupported = typeof Map === 'function';
+    function maybeNativeMap() {
+        return (isNativeMapSupported ? new Map() : new MapPolyfill());
+    }
     var HashMap = (function () {
         function HashMap(obj) {
-            this.data = {};
             var isArr = isArray(obj);
-            this.data = {};
+            this.data = maybeNativeMap();
             var thisMap = this;
             (obj instanceof HashMap)
                 ? obj.each(visit)
@@ -642,24 +679,29 @@
                 isArr ? thisMap.set(value, key) : thisMap.set(key, value);
             }
         }
+        HashMap.prototype.hasKey = function (key) {
+            return this.data.has(key);
+        };
         HashMap.prototype.get = function (key) {
-            return this.data.hasOwnProperty(key) ? this.data[key] : null;
+            return this.data.get(key);
         };
         HashMap.prototype.set = function (key, value) {
-            return (this.data[key] = value);
+            this.data.set(key, value);
+            return value;
         };
         HashMap.prototype.each = function (cb, context) {
-            for (var key in this.data) {
-                if (this.data.hasOwnProperty(key)) {
-                    cb.call(context, this.data[key], key);
-                }
-            }
+            this.data.forEach(function (value, key) {
+                cb.call(context, value, key);
+            });
         };
         HashMap.prototype.keys = function () {
-            return keys(this.data);
+            var keys = this.data.keys();
+            return isNativeMapSupported
+                ? Array.from(keys)
+                : keys;
         };
         HashMap.prototype.removeKey = function (key) {
-            delete this.data[key];
+            this.data["delete"](key);
         };
         return HashMap;
     }());
@@ -758,6 +800,37 @@
         noop: noop,
         RADIAN_TO_DEGREE: RADIAN_TO_DEGREE
     });
+
+    /*! *****************************************************************************
+    Copyright (c) Microsoft Corporation.
+
+    Permission to use, copy, modify, and/or distribute this software for any
+    purpose with or without fee is hereby granted.
+
+    THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+    REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+    AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+    INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+    LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+    OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+    PERFORMANCE OF THIS SOFTWARE.
+    ***************************************************************************** */
+    /* global Reflect, Promise */
+
+    var extendStatics$1 = function(d, b) {
+        extendStatics$1 = Object.setPrototypeOf ||
+            ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||
+            function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };
+        return extendStatics$1(d, b);
+    };
+
+    function __extends$1(d, b) {
+        if (typeof b !== "function" && b !== null)
+            throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+        extendStatics$1(d, b);
+        function __() { this.constructor = d; }
+        d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+    }
 
     function create(x, y) {
         if (x == null) {
@@ -1945,7 +2018,7 @@
         stop(this.event);
     }
     var EmptyProxy = (function (_super) {
-        __extends(EmptyProxy, _super);
+        __extends$1(EmptyProxy, _super);
         function EmptyProxy() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.handler = null;
@@ -1968,7 +2041,7 @@
     ];
     var tmpRect = new BoundingRect(0, 0, 0, 0);
     var Handler = (function (_super) {
-        __extends(Handler, _super);
+        __extends$1(Handler, _super);
         function Handler(storage, painter, proxy, painterRoot, pointerSize) {
             var _this = _super.call(this) || this;
             _this._hovered = new HoveredResult(0, 0);
@@ -4179,7 +4252,7 @@
     var encodeBase64 = (function () {
         if (env.hasGlobalWindow && isFunction(window.btoa)) {
             return function (str) {
-                return window.btoa(unescape(str));
+                return window.btoa(unescape(encodeURIComponent(str)));
             };
         }
         if (typeof Buffer !== 'undefined') {
@@ -4929,7 +5002,7 @@
         return new Date().getTime();
     }
     var Animation = (function (_super) {
-        __extends(Animation, _super);
+        __extends$1(Animation, _super);
         function Animation(opts) {
             var _this = _super.call(this) || this;
             _this._running = false;
@@ -5320,7 +5393,7 @@
         return DOMHandlerScope;
     }());
     var HandlerDomProxy = (function (_super) {
-        __extends(HandlerDomProxy, _super);
+        __extends$1(HandlerDomProxy, _super);
         function HandlerDomProxy(dom, painterRoot) {
             var _this = _super.call(this) || this;
             _this.__pointerCapturing = false;
@@ -6800,7 +6873,7 @@
     }
 
     var Group = (function (_super) {
-        __extends(Group, _super);
+        __extends$1(Group, _super);
         function Group(opts) {
             var _this = _super.call(this) || this;
             _this.isGroup = true;
@@ -7228,7 +7301,7 @@
     function registerPainter(name, Ctor) {
         painterCtors[name] = Ctor;
     }
-    var version = '5.4.0';
+    var version = '5.4.1';
 
     var zrender = /*#__PURE__*/Object.freeze({
         __proto__: null,
@@ -9532,7 +9605,7 @@
     var PRIMARY_STATES_KEYS$1 = ['z', 'z2', 'invisible'];
     var PRIMARY_STATES_KEYS_IN_HOVER_LAYER = ['invisible'];
     var Displayable = (function (_super) {
-        __extends(Displayable, _super);
+        __extends$1(Displayable, _super);
         function Displayable(props) {
             return _super.call(this, props) || this;
         }
@@ -11090,7 +11163,7 @@
         'culling', 'z', 'z2', 'zlevel', 'parent'
     ]);
     var Path = (function (_super) {
-        __extends(Path, _super);
+        __extends$1(Path, _super);
         function Path(opts) {
             return _super.call(this, opts) || this;
         }
@@ -11417,7 +11490,7 @@
         };
         Path.extend = function (defaultProps) {
             var Sub = (function (_super) {
-                __extends(Sub, _super);
+                __extends$1(Sub, _super);
                 function Sub(opts) {
                     var _this = _super.call(this, opts) || this;
                     defaultProps.init && defaultProps.init.call(_this, opts);
@@ -11460,7 +11533,7 @@
         miterLimit: 2
     }, DEFAULT_PATH_STYLE);
     var TSpan = (function (_super) {
-        __extends(TSpan, _super);
+        __extends$1(TSpan, _super);
         function TSpan() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -11529,7 +11602,7 @@
             && source.width && source.height);
     }
     var ZRImage = (function (_super) {
-        __extends(ZRImage, _super);
+        __extends$1(ZRImage, _super);
         function ZRImage() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -11720,7 +11793,7 @@
     }());
     var subPixelOptimizeOutputShape = {};
     var Rect = (function (_super) {
-        __extends(Rect, _super);
+        __extends$1(Rect, _super);
         function Rect(opts) {
             return _super.call(this, opts) || this;
         }
@@ -11788,7 +11861,7 @@
         }, DEFAULT_COMMON_ANIMATION_PROPS.style)
     };
     var ZRText = (function (_super) {
-        __extends(ZRText, _super);
+        __extends$1(ZRText, _super);
         function ZRText(opts) {
             var _this = _super.call(this) || this;
             _this.type = 'text';
@@ -12568,7 +12641,7 @@
 
       return state;
     }
-    /**FI
+    /**
      * Set hover style (namely "emphasis style") of element.
      * @param el Should not be `zrender/graphic/Group`.
      * @param focus 'self' | 'selfInSeries' | 'series'
@@ -13424,7 +13497,7 @@
         return path;
     }
     var SVGPath = (function (_super) {
-        __extends(SVGPath, _super);
+        __extends$1(SVGPath, _super);
         function SVGPath() {
             return _super !== null && _super.apply(this, arguments) || this;
         }
@@ -13462,7 +13535,7 @@
     function extendFromString(str, defaultOpts) {
         var innerOpts = createPathOptions(str, defaultOpts);
         var Sub = (function (_super) {
-            __extends(Sub, _super);
+            __extends$1(Sub, _super);
             function Sub(opts) {
                 var _this = _super.call(this, opts) || this;
                 _this.applyTransform = innerOpts.applyTransform;
@@ -13528,7 +13601,7 @@
         return CircleShape;
     }());
     var Circle = (function (_super) {
-        __extends(Circle, _super);
+        __extends$1(Circle, _super);
         function Circle(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13553,7 +13626,7 @@
         return EllipseShape;
     }());
     var Ellipse = (function (_super) {
-        __extends(Ellipse, _super);
+        __extends$1(Ellipse, _super);
         function Ellipse(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13820,7 +13893,7 @@
         return SectorShape;
     }());
     var Sector = (function (_super) {
-        __extends(Sector, _super);
+        __extends$1(Sector, _super);
         function Sector(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13848,7 +13921,7 @@
         return RingShape;
     }());
     var Ring = (function (_super) {
-        __extends(Ring, _super);
+        __extends$1(Ring, _super);
         function Ring(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13965,7 +14038,7 @@
         return PolygonShape;
     }());
     var Polygon = (function (_super) {
-        __extends(Polygon, _super);
+        __extends$1(Polygon, _super);
         function Polygon(opts) {
             return _super.call(this, opts) || this;
         }
@@ -13989,7 +14062,7 @@
         return PolylineShape;
     }());
     var Polyline = (function (_super) {
-        __extends(Polyline, _super);
+        __extends$1(Polyline, _super);
         function Polyline(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14021,7 +14094,7 @@
         return LineShape;
     }());
     var Line = (function (_super) {
-        __extends(Line, _super);
+        __extends$1(Line, _super);
         function Line(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14104,7 +14177,7 @@
         }
     }
     var BezierCurve = (function (_super) {
-        __extends(BezierCurve, _super);
+        __extends$1(BezierCurve, _super);
         function BezierCurve(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14179,7 +14252,7 @@
         return ArcShape;
     }());
     var Arc = (function (_super) {
-        __extends(Arc, _super);
+        __extends$1(Arc, _super);
         function Arc(opts) {
             return _super.call(this, opts) || this;
         }
@@ -14209,7 +14282,7 @@
     Arc.prototype.type = 'arc';
 
     var CompoundPath = (function (_super) {
-        __extends(CompoundPath, _super);
+        __extends$1(CompoundPath, _super);
         function CompoundPath() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.type = 'compound';
@@ -14269,7 +14342,7 @@
     }());
 
     var LinearGradient = (function (_super) {
-        __extends(LinearGradient, _super);
+        __extends$1(LinearGradient, _super);
         function LinearGradient(x, y, x2, y2, colorStops, globalCoord) {
             var _this = _super.call(this, colorStops) || this;
             _this.x = x == null ? 0 : x;
@@ -14284,7 +14357,7 @@
     }(Gradient));
 
     var RadialGradient = (function (_super) {
-        __extends(RadialGradient, _super);
+        __extends$1(RadialGradient, _super);
         function RadialGradient(x, y, r, colorStops, globalCoord) {
             var _this = _super.call(this, colorStops) || this;
             _this.x = x == null ? 0.5 : x;
@@ -14418,7 +14491,7 @@
 
     var m = [];
     var IncrementalDisplayable = (function (_super) {
-        __extends(IncrementalDisplayable, _super);
+        __extends$1(IncrementalDisplayable, _super);
         function IncrementalDisplayable() {
             var _this = _super !== null && _super.apply(this, arguments) || this;
             _this.notClear = true;
@@ -17855,7 +17928,7 @@
       useUTC: false
     };
 
-    var VISUAL_DIMENSIONS = createHashMap(['tooltip', 'label', 'itemName', 'itemId', 'itemGroupId', 'seriesName']);
+    var VISUAL_DIMENSIONS = createHashMap(['tooltip', 'label', 'itemName', 'itemId', 'itemGroupId', 'itemChildGroupId', 'seriesName']);
     var SOURCE_FORMAT_ORIGINAL = 'original';
     var SOURCE_FORMAT_ARRAY_ROWS = 'arrayRows';
     var SOURCE_FORMAT_OBJECT_ROWS = 'objectRows';
@@ -18465,7 +18538,7 @@
           this.restoreData();
         } // By design, if `setOption(option2)` at the second time, and `option2` is a `ECUnitOption`,
         // it should better not have the same props with `MediaUnit['option']`.
-        // Becuase either `option2` or `MediaUnit['option']` will be always merged to "current option"
+        // Because either `option2` or `MediaUnit['option']` will be always merged to "current option"
         // rather than original "baseOption". If they both override a prop, the result might be
         // unexpected when media state changed after `setOption` called.
         // If we really need to modify a props in each `MediaUnit['option']`, use the full version
@@ -18591,7 +18664,7 @@
                     if (seriesImportName) {
                       error("Series " + subType + " is used but not imported.\nimport { " + seriesImportName + " } from 'echarts/charts';\necharts.use([" + seriesImportName + "]);");
                     } else {
-                      error("Unkown series " + subType);
+                      error("Unknown series " + subType);
                     }
                   }
                 }
@@ -18897,7 +18970,7 @@
       };
       /**
        * After filtering, series may be different
-       * frome raw series.
+       * from raw series.
        */
 
 
@@ -18924,7 +18997,7 @@
       };
       /**
        * After filtering, series may be different.
-       * frome raw series.
+       * from raw series.
        */
 
 
@@ -19007,8 +19080,8 @@
         };
 
         initBase = function (ecModel, baseOption) {
-          // Using OPTION_INNER_KEY to mark that this option can not be used outside,
-          // i.e. `chart.setOption(chart.getModel().option);` is forbiden.
+          // Using OPTION_INNER_KEY to mark that this option cannot be used outside,
+          // i.e. `chart.setOption(chart.getModel().option);` is forbidden.
           ecModel.option = {};
           ecModel.option[OPTION_INNER_KEY] = OPTION_INNER_VALUE; // Init with series: [], in case of calling findSeries method
           // before series initialized.
@@ -19142,8 +19215,8 @@
 
       CoordinateSystemManager.prototype.create = function (ecModel, api) {
         var coordinateSystems = [];
-        each(coordinateSystemCreators, function (creater, type) {
-          var list = creater.create(ecModel, api);
+        each(coordinateSystemCreators, function (creator, type) {
+          var list = creator.create(ecModel, api);
           coordinateSystems = coordinateSystems.concat(list || []);
         });
         this._coordinateSystems = coordinateSystems;
@@ -19228,7 +19301,7 @@
           // the restore merge solution is essentially incorrect.
           // the mapping can not be 100% consistent with ecModel, which probably brings
           // potential bug!
-          // The first merge is delayed, becuase in most cases, users do not call `setOption` twice.
+          // The first merge is delayed, because in most cases, users do not call `setOption` twice.
           // let fakeCmptsMap = this._fakeCmptsMap;
           // if (!fakeCmptsMap) {
           //     fakeCmptsMap = this._fakeCmptsMap = createHashMap();
@@ -19239,7 +19312,7 @@
           // );
           // For simplicity, timeline options and media options do not support merge,
           // that is, if you `setOption` twice and both has timeline options, the latter
-          // timeline opitons will not be merged to the formers, but just substitude them.
+          // timeline options will not be merged to the former, but just substitute them.
           if (newParsedOption.timelineOptions.length) {
             optionBackup.timelineOptions = newParsedOption.timelineOptions;
           }
@@ -19480,10 +19553,10 @@
       var realMap = {
         width: ecWidth,
         height: ecHeight,
-        aspectratio: ecWidth / ecHeight // lowser case for convenientce.
+        aspectratio: ecWidth / ecHeight // lower case for convenience.
 
       };
-      var applicatable = true;
+      var applicable = true;
       each(query, function (value, attr) {
         var matched = attr.match(QUERY_REG);
 
@@ -19495,10 +19568,10 @@
         var realAttr = matched[2].toLowerCase();
 
         if (!compare(realMap[realAttr], value, operator)) {
-          applicatable = false;
+          applicable = false;
         }
       });
-      return applicatable;
+      return applicable;
     }
 
     function compare(real, expect, operator) {
@@ -20992,8 +21065,8 @@
     // compat it?
     // type TooltipFormatResultLegacyObject = {
     //     // `html` means the markup language text, either in 'html' or 'richText'.
-    //     // The name `html` is not appropriate becuase in 'richText' it is not a HTML
-    //     // string. But still support it for backward compat.
+    //     // The name `html` is not appropriate because in 'richText' it is not a HTML
+    //     // string. But still support it for backward compatibility.
     //     html: string;
     //     markers: Dictionary<ColorString>;
     // };
@@ -21251,11 +21324,11 @@
       };
 
       Task.prototype.setOutputEnd = function (end) {
-        // This only happend in dataTask, dataZoom, map, currently.
+        // This only happens in dataTask, dataZoom, map, currently.
         // where dataZoom do not set end each time, but only set
-        // when reset. So we should record the setted end, in case
+        // when reset. So we should record the set end, in case
         // that the stub of dataZoom perform again and earse the
-        // setted end by upstream.
+        // set end by upstream.
         this._outputDueEnd = this._settedOutputEnd = end;
       };
 
@@ -21292,7 +21365,7 @@
         current++;
         return result;
       }
-    }(); ///////////////////////////////////////////////////////////
+    }(); // -----------------------------------------------------------------------------
     // For stream debug (Should be commented out after used!)
     // @usage: printTask(this, 'begin');
     // @usage: printTask(this, null, {someExtraProp});
@@ -21652,7 +21725,7 @@
       /**
        * Only support by dimension index.
        * No need to support by dimension name in transform function,
-       * becuase transform function is not case-specific, no need to use name literally.
+       * because transform function is not case-specific, no need to use name literally.
        */
 
 
@@ -21690,8 +21763,8 @@
       } // [MEMO]
       // Create a new dimensions structure for exposing.
       // Do not expose all dimension info to users directly.
-      // Becuase the dimension is probably auto detected from data and not might reliable.
-      // Should not lead the transformers to think that is relialbe and return it.
+      // Because the dimension is probably auto detected from data and not might reliable.
+      // Should not lead the transformers to think that is reliable and return it.
       // See [DIMENSION_INHERIT_RULE] in `sourceManager.ts`.
 
 
@@ -22016,7 +22089,7 @@
         if (firstUpSource && resultIndex === 0 // If transformer returns `dimensions`, it means that the transformer has different
         // dimensions definitions. We do not inherit anything from upstream.
         && !result.dimensions) {
-          var startIndex = firstUpSource.startIndex; // We copy the header of upstream to the result becuase:
+          var startIndex = firstUpSource.startIndex; // We copy the header of upstream to the result, because:
           // (1) The returned data always does not contain header line and can not be used
           // as dimension-detection. In this case we can not use "detected dimensions" of
           // upstream directly, because it might be detected based on different `seriesLayoutBy`.
@@ -24058,7 +24131,7 @@
       __extends(SeriesModel, _super);
 
       function SeriesModel() {
-        // [Caution]: Becuase this class or desecendants can be used as `XXX.extend(subProto)`,
+        // [Caution]: Because this class or desecendants can be used as `XXX.extend(subProto)`,
         // the class members must not be initialized in constructor or declaration place.
         // Otherwise there is bad case:
         //   class A {xxx = 1;}
@@ -24179,7 +24252,7 @@
       };
       /**
        * Init a data structure from data related option in series
-       * Must be overriden.
+       * Must be overridden.
        */
 
 
@@ -24290,7 +24363,7 @@
       /**
        * Get base axis if has coordinate system and has axis.
        * By default use coordSys.getBaseAxis();
-       * Can be overrided for some chart.
+       * Can be overridden for some chart.
        * @return {type} description
        */
 
@@ -24493,7 +24566,7 @@
           var selectedMap = option.selectedMap;
 
           for (var i = 0; i < len; i++) {
-            var dataIndex = innerDataIndices[i]; // TODO diffrent types of data share same object.
+            var dataIndex = innerDataIndices[i]; // TODO different types of data share same object.
 
             var nameOrId = getSelectionKey(data, dataIndex);
             selectedMap[nameOrId] = true;
@@ -25097,7 +25170,7 @@
       var styleMapper = seriesModel.visualStyleMapper || defaultStyleMappers[stylePath];
 
       if (!styleMapper) {
-        console.warn("Unkown style type '" + stylePath + "'.");
+        console.warn("Unknown style type '" + stylePath + "'.");
         return defaultStyleMappers.itemStyle;
       }
 
@@ -25109,7 +25182,7 @@
       var colorKey = seriesModel.visualDrawType || defaultColorKey[stylePath];
 
       if (!colorKey) {
-        console.warn("Unkown style type '" + stylePath + "'.");
+        console.warn("Unknown style type '" + stylePath + "'.");
         return 'fill';
       }
 
@@ -25597,12 +25670,12 @@
               }
 
               var performArgs = scheduler.getPerformArgs(task, opt.block); // FIXME
-              // if intending to decalare `performRawSeries` in handlers, only
+              // if intending to declare `performRawSeries` in handlers, only
               // stream-independent (specifically, data item independent) operations can be
-              // performed. Because is a series is filtered, most of the tasks will not
+              // performed. Because if a series is filtered, most of the tasks will not
               // be performed. A stream-dependent operation probably cause wrong biz logic.
               // Perhaps we should not provide a separate callback for this case instead
-              // of providing the config `performRawSeries`. The stream-dependent operaions
+              // of providing the config `performRawSeries`. The stream-dependent operations
               // and stream-independent operations should better not be mixed.
 
               performArgs.skip = !stageHandler.performRawSeries && ecModel.isSeriesFiltered(task.context.model);
@@ -25723,7 +25796,7 @@
         var errMsg = '';
 
         if ("development" !== 'production') {
-          errMsg = '"createOnAllSeries" do not supported for "overallReset", ' + 'becuase it will block all streams.';
+          errMsg = '"createOnAllSeries" is not supported for "overallReset", ' + 'because it will block all streams.';
         }
 
         assert(!stageHandler.createOnAllSeries, errMsg);
@@ -25732,10 +25805,10 @@
           ecModel.eachRawSeriesByType(seriesType, createStub);
         } else if (getTargetSeries) {
           getTargetSeries(ecModel, api).each(createStub);
-        } // Otherwise, (usually it is legancy case), the overall task will only be
-        // executed when upstream dirty. Otherwise the progressive rendering of all
+        } // Otherwise, (usually it is legacy case), the overall task will only be
+        // executed when upstream is dirty. Otherwise the progressive rendering of all
         // pipelines will be disabled unexpectedly. But it still needs stubs to receive
-        // dirty info from upsteam.
+        // dirty info from upstream.
         else {
             overallProgress = false;
             each(ecModel.getSeries(), createStub);
@@ -28079,7 +28152,7 @@
 
     var lifecycle = new Eventful();
 
-    // The implentations will be registered when installing the component.
+    // The implementations will be registered when installing the component.
     // Avoid these code being bundled to the core module.
 
     var implsStore = {}; // TODO Type
@@ -28113,7 +28186,7 @@
     // So data stack stage should be in front of data processing stage.
 
     var PRIORITY_PROCESSOR_DATASTACK = 900; // "Data filter" will block the stream, so it should be
-    // put at the begining of data processing.
+    // put at the beginning of data processing.
 
     var PRIORITY_PROCESSOR_FILTER = 1000;
     var PRIORITY_PROCESSOR_DEFAULT = 2000;
@@ -28363,8 +28436,8 @@
               scheduler.performDataProcessorTasks(ecModel);
               updateStreamModes(this, ecModel); // Do not update coordinate system here. Because that coord system update in
               // each frame is not a good user experience. So we follow the rule that
-              // the extent of the coordinate system is determin in the first frame (the
-              // frame is executed immedietely after task reset.
+              // the extent of the coordinate system is determined in the first frame (the
+              // frame is executed immediately after task reset.
               // this._coordSysMgr.update(ecModel, api);
               // console.log('--- ec frame visual ---', remainTime);
 
@@ -29099,9 +29172,9 @@
         if (flush) {
           this._zr.flush();
         } else if (flush !== false && env.browser.weChat) {
-          // In WeChat embeded browser, `requestAnimationFrame` and `setInterval`
+          // In WeChat embedded browser, `requestAnimationFrame` and `setInterval`
           // hang when sliding page (on touch event), which cause that zr does not
-          // refresh util user interaction finished, which is not expected.
+          // refresh until user interaction finished, which is not expected.
           // But `dispatchAction` may be called too frequently when pan on touch
           // screen, which impacts performance if do not throttle them.
           this._throttledZrFlush();
@@ -29178,7 +29251,7 @@
           }) : ecModel.eachSeries(doPrepare);
 
           function doPrepare(model) {
-            // By defaut view will be reused if possible for the case that `setOption` with "notMerge"
+            // By default view will be reused if possible for the case that `setOption` with "notMerge"
             // mode and need to enable transition animation. (Usually, when they have the same id, or
             // especially no id but have the same type & name & index. See the `model.id` generation
             // rule in `makeIdAndName` and `viewId` generation rule here).
@@ -29359,17 +29432,17 @@
             // Save total ecModel here for undo/redo (after restoring data and before processing data).
             // Undo (restoration of total ecModel) can be carried out in 'action' or outside API call.
             // Create new coordinate system each update
-            // In LineView may save the old coordinate system and use it to get the orignal point
+            // In LineView may save the old coordinate system and use it to get the original point.
 
             coordSysMgr.create(ecModel, api);
             scheduler.performDataProcessorTasks(ecModel, payload); // Current stream render is not supported in data process. So we can update
             // stream modes after data processing, where the filtered data is used to
-            // deteming whether use progressive rendering.
+            // determine whether to use progressive rendering.
 
             updateStreamModes(this, ecModel); // We update stream modes before coordinate system updated, then the modes info
             // can be fetched when coord sys updating (consider the barGrid extent fix). But
             // the drawback is the full coord info can not be fetched. Fortunately this full
-            // coord is not requied in stream mode updater currently.
+            // coord is not required in stream mode updater currently.
 
             coordSysMgr.update(ecModel, api);
             clearColorPalette(ecModel);
@@ -29668,8 +29741,8 @@
 
         bindRenderedEvent = function (zr, ecIns) {
           zr.on('rendered', function (params) {
-            ecIns.trigger('rendered', params); // The `finished` event should not be triggered repeatly,
-            // so it should only be triggered when rendering indeed happend
+            ecIns.trigger('rendered', params); // The `finished` event should not be triggered repeatedly,
+            // so it should only be triggered when rendering indeed happens
             // in zrender. (Consider the case that dipatchAction is keep
             // triggering when mouse move).
 
@@ -29841,7 +29914,7 @@
             }
 
             chartView.group.silent = !!seriesModel.get('silent'); // Should not call markRedraw on group, because it will disable zrender
-            // increamental render (alway render from the __startIndex each frame)
+            // incremental render (always render from the __startIndex each frame)
             // chartView.group.markRedraw();
 
             updateBlend(seriesModel, chartView);
@@ -29949,7 +30022,7 @@
           chartView.eachRendered(function (el) {
             // FIXME marker and other components
             if (!el.isGroup) {
-              // DONT mark the element dirty. In case element is incremental and don't wan't to rerender.
+              // DON'T mark the element dirty. In case element is incremental and don't want to rerender.
               el.style.blend = blendMode;
             }
           });
@@ -30062,7 +30135,7 @@
 
               if (el instanceof Path) {
                 savePathStates(el);
-              } // Only updated on changed element. In case element is incremental and don't wan't to rerender.
+              } // Only updated on changed element. In case element is incremental and don't want to rerender.
               // TODO, a more proper way?
 
 
@@ -30087,7 +30160,7 @@
                 if (textGuide) {
                   textGuide.stateTransition = stateTransition;
                 }
-              } // The use higlighted and selected flag to toggle states.
+              } // Use highlighted and selected flag to toggle states.
 
 
               if (el.__dirty) {
@@ -30350,7 +30423,7 @@
       connectedGroups[groupId] = false;
     }
     /**
-     * Alias and backword compat
+     * Alias and backward compatibility
      */
 
     var disconnect = disConnect;
@@ -30555,7 +30628,7 @@
     //         chart.dispatchAction(payload, opt);
     //     }
     // }
-    // Buitlin global visual
+    // Builtin global visual
 
     registerVisual(PRIORITY_VISUAL_GLOBAL, seriesStyleTask);
     registerVisual(PRIORITY_VISUAL_CHART_DATA_CUSTOM, dataStyleTask);
@@ -31260,8 +31333,8 @@
             ordinalMeta: ordinalMeta
           }); // If retrieving data by index,
           //   use <index, type, ordinalMeta> to determine whether data can be shared.
-          //   (Becuase in this case there might be no dimension name defined in dataset, but indices always exists).
-          //   (indices are always 0, 1, 2, ..., so we can ignore them to shorten the hash).
+          //   (Because in this case there might be no dimension name defined in dataset, but indices always exists).
+          //   (Indices are always 0, 1, 2, ..., so we can ignore them to shorten the hash).
           // Otherwise if retrieving data by property name (like `data: [{aa: 123, bb: 765}, ...]`),
           //   use <property, type, ordinalMeta> in hash.
 
@@ -31361,7 +31434,7 @@
     var isObject$2 = isObject;
     var map$1 = map;
     var CtorInt32Array$1 = typeof Int32Array === 'undefined' ? Array : Int32Array; // Use prefix to avoid index to be the same as otherIdList[idx],
-    // which will cause weird udpate animation.
+    // which will cause weird update animation.
 
     var ID_PREFIX = 'e\0\0';
     var INDEX_NOT_FOUND = -1; // type SeriesDimensionIndex = DimensionIndex;
@@ -31396,13 +31469,13 @@
         // private _optionModels: Model[] = [];
         // Global visual properties after visual coding
 
-        this._visual = {}; // Globel layout properties.
+        this._visual = {}; // Global layout properties.
 
         this._layout = {}; // Item visual properties after visual coding
 
         this._itemVisuals = []; // Item layout properties after layout
 
-        this._itemLayouts = []; // Graphic elemnents
+        this._itemLayouts = []; // Graphic elements
 
         this._graphicEls = []; // key: dim, value: extent
 
@@ -31506,7 +31579,7 @@
        * Because only those dimensions will have auto-generated dimension names if not
        * have a user-specified name, and other dimensions will get a return of null/undefined.
        *
-       * @notice Becuause of this reason, should better use `getDimensionIndex` instead, for examples:
+       * @notice Because of this reason, should better use `getDimensionIndex` instead, for examples:
        * ```js
        * const val = data.getStore().get(data.getDimensionIndex(dim), dataIdx);
        * ```
@@ -31526,7 +31599,7 @@
 
         if (!this._dimOmitted) {
           return this.dimensions[dimIdx];
-        } // Retrieve from series dimension definition becuase it probably contains
+        } // Retrieve from series dimension definition because it probably contains
         // generated dimension name (like 'x', 'y').
 
 
@@ -31572,7 +31645,7 @@
        *     + If there is the same concrete dim name defined in `series.dimensions` or `dataset.dimensions`,
        *        it means that concrete name.
        *     + If not, it will be converted to a number, which means the index of the dimension.
-       *        (why? because of the backward compatbility. We have been tolerating number-like string in
+       *        (why? because of the backward compatibility. We have been tolerating number-like string in
        *        dimension setting, although now it seems that it is not a good idea.)
        *     For example, `visualMap[i].dimension: "1"` is the same meaning as `visualMap[i].dimension: 1`,
        *     if no dimension name is defined as `"1"`.
@@ -31580,7 +31653,7 @@
        *   For example, it can be be default name `"x"`, `"y"`, `"z"`, `"lng"`, `"lat"`, `"angle"`, `"radius"`,
        *   or customized in `dimensions` property of option like `"age"`.
        *
-       * @return recogonized `DimensionIndex`. Otherwise return null/undefined (means that dim is `DimensionName`).
+       * @return recognized `DimensionIndex`. Otherwise return null/undefined (means that dim is `DimensionName`).
        */
 
 
@@ -31596,7 +31669,7 @@
 
         if ("development" !== 'production') {
           if (dimIdx == null) {
-            throw new Error('Unkown dimension ' + dim);
+            throw new Error('Unknown dimension ' + dim);
           }
         }
 
@@ -31721,7 +31794,7 @@
        *            [NaN, 43, 1],
        *            ['-', 'asdf', 0]
        *        ]
-       *        Each item is exaclty cooresponding to a dimension.
+       *        Each item is exactly corresponding to a dimension.
        */
 
 
@@ -31843,7 +31916,7 @@
       };
       /**
        * Calculate extent on a filtered data might be time consuming.
-       * Approximate extent is only used for: calculte extent of filtered data outside.
+       * Approximate extent is only used for: calculate extent of filtered data outside.
        */
 
 
@@ -31860,7 +31933,7 @@
         isObject$2(key) ? extend(this._calculationInfo, key) : this._calculationInfo[key] = value;
       };
       /**
-       * @return Never be null/undefined. `number` will be converted to string. Becuase:
+       * @return Never be null/undefined. `number` will be converted to string. Because:
        * In most cases, name is used in display, where returning a string is more convenient.
        * In other cases, name is used in query (see `indexOfName`), where we can keep the
        * rule that name `2` equals to name `'2'`.
@@ -31894,7 +31967,7 @@
         return ordinal;
       };
       /**
-       * @return Never null/undefined. `number` will be converted to string. Becuase:
+       * @return Never null/undefined. `number` will be converted to string. Because:
        * In all cases having encountered at present, id is used in making diff comparison, which
        * are usually based on hash map. We can keep the rule that the internal id are always string
        * (treat `2` is the same as `'2'`) to make the related logic simple.
@@ -31962,7 +32035,7 @@
         }), idx) : store.getValues(dimensions);
       };
       /**
-       * If value is NaN. Inlcuding '-'
+       * If value is NaN. Including '-'
        * Only check the coord dimensions.
        */
 
@@ -31982,7 +32055,7 @@
         return true;
       };
       /**
-       * Retreive the index with given name
+       * Retrieve the index with given name
        */
 
 
@@ -32030,7 +32103,7 @@
         return rawIndex;
       };
       /**
-       * Retreive the index of nearest value
+       * Retrieve the index of nearest value
        * @param dim
        * @param value
        * @param [maxDistance=Infinity]
@@ -32138,8 +32211,8 @@
         }
 
         var dimIndices = map$1(normalizeDimensions(dims), this._getStoreDimIndex, this); // If do shallow clone here, if there are too many stacked series,
-        // it still cost lots of memory, becuase `_store.dimensions` are not shared.
-        // We should consider there probably be shallow clone happen in each sereis
+        // it still cost lots of memory, because `_store.dimensions` are not shared.
+        // We should consider there probably be shallow clone happen in each series
         // in consequent filter/map.
 
         this._store.modify(dimIndices, fCtx ? bind(cb, fCtx) : cb);
@@ -32443,7 +32516,7 @@
           return dimensions;
         };
         /**
-         * Data in excludeDimensions is copied, otherwise transfered.
+         * Data in excludeDimensions is copied, otherwise transferred.
          */
 
 
@@ -33763,8 +33836,8 @@
       };
 
       IntervalScale.prototype.setInterval = function (interval) {
-        this._interval = interval; // Dropped auto calculated niceExtent and use user setted extent
-        // We assume user wan't to set both interval, min, max to get a better result
+        this._interval = interval; // Dropped auto calculated niceExtent and use user-set extent.
+        // We assume user wants to set both interval, min, max to get a better result.
 
         this._niceExtent = this._extent.slice();
         this._intervalPrecision = getIntervalPrecision(interval);
@@ -34256,7 +34329,7 @@
             }
           } else {
             // `barMinWidth/barMaxWidth` has higher priority than `barWidth`, as
-            // CSS does. Becuase barWidth can be a percent value, where
+            // CSS does. Because barWidth can be a percent value, where
             // `barMaxWidth` can be used to restrict the final width.
             var finalWidth = column.width;
 
@@ -34731,7 +34804,7 @@
 
     function getDateInterval(approxInterval, daysInMonth) {
       approxInterval /= ONE_DAY;
-      return approxInterval > 16 ? 16 // Math.floor(daysInMonth / 2) + 1  // In this case we only want one tick betwen two month.
+      return approxInterval > 16 ? 16 // Math.floor(daysInMonth / 2) + 1  // In this case we only want one tick between two months.
       : approxInterval > 7.5 ? 7 // TODO week 7 or day 8?
       : approxInterval > 3.5 ? 4 : approxInterval > 1.5 ? 2 : 1;
     }
@@ -35413,7 +35486,7 @@
       var ecModel = model.ecModel;
 
       if (ecModel && scaleType === 'time'
-      /*|| scaleType === 'interval' */
+      /* || scaleType === 'interval' */
       ) {
         var barSeriesModels = prepareLayoutBarSeries('bar', ecModel);
         var isBaseAxisAndHasBarSeries_1 = false;
@@ -35676,7 +35749,7 @@
     }
     /**
      * Set `categoryInterval` as 0 implicitly indicates that
-     * show all labels reguardless of overlap.
+     * show all labels regardless of overlap.
      * @param {Object} axis axisModel.axis
      */
 
@@ -35776,7 +35849,7 @@
     }();
 
     /**
-     * Create a muti dimension List structure from seriesModel.
+     * Create a multi dimension List structure from seriesModel.
      */
 
     function createList(seriesModel) {
@@ -35801,9 +35874,9 @@
         axisModel = new Model(option); // FIXME
         // Currently AxisModelCommonMixin has nothing to do with the
         // the requirements of `axisHelper.createScaleByModel`. For
-        // example the method `getCategories` and `getOrdinalMeta`
-        // are required for `'category'` axis, and ecModel are required
-        // for `'time'` axis. But occationally echarts-gl happened
+        // example the methods `getCategories` and `getOrdinalMeta`
+        // are required for `'category'` axis, and ecModel is required
+        // for `'time'` axis. But occasionally echarts-gl happened
         // to only use `'value'` axis.
         // zrUtil.mixin(axisModel, AxisModelCommonMixin);
       }
@@ -35816,7 +35889,7 @@
     /**
      * Mixin common methods to axis model,
      *
-     * Inlcude methods
+     * Include methods
      * `getFormattedLabels() => Array.<string>`
      * `getCategories() => Array.<string>`
      * `getMin(origin: boolean) => number`
@@ -36970,7 +37043,7 @@
     // Should use `ComponentModel.extend` or `class XXXX extend ComponentModel` to create class.
     // Then use `registerComponentModel` in `install` parameter when `use` this extension. For example:
     // class Bar3DModel extends ComponentModel {}
-    // export function install(registers) { regsiters.registerComponentModel(Bar3DModel); }
+    // export function install(registers) { registers.registerComponentModel(Bar3DModel); }
     // echarts.use(install);
 
     function extendComponentModel(proto) {
@@ -38944,7 +39017,7 @@
             }
         };
     }
-    var buitinShapesDef = {
+    var builtinShapesDef = {
         circle: [createAttrsConvert(['cx', 'cy', 'r'])],
         polyline: [convertPolyShape, validatePolyShape],
         polygon: [convertPolyShape, validatePolyShape]
@@ -38961,7 +39034,7 @@
     function brushSVGPath(el, scope) {
         var style = el.style;
         var shape = el.shape;
-        var builtinShpDef = buitinShapesDef[el.type];
+        var builtinShpDef = builtinShapesDef[el.type];
         var attrs = {};
         var needsAnimate = scope.animation;
         var svgElType = 'path';
@@ -38977,11 +39050,12 @@
             builtinShpDef[0](shape, attrs, mul);
         }
         else {
+            var needBuildPath = !el.path || el.shapeChanged();
             if (!el.path) {
                 el.createPathProxy();
             }
             var path = el.path;
-            if (el.shapeChanged()) {
+            if (needBuildPath) {
                 path.beginPath();
                 el.buildPath(path, el.shape);
                 el.pathUpdated();
@@ -39201,9 +39275,12 @@
     }
     function setPattern(el, attrs, target, scope) {
         var val = el.style[target];
-        var patternAttrs = {
-            'patternUnits': 'userSpaceOnUse'
-        };
+        var boundingRect = el.getBoundingRect();
+        var patternAttrs = {};
+        var repeat = val.repeat;
+        var noRepeat = repeat === 'no-repeat';
+        var repeatX = repeat === 'repeat-x';
+        var repeatY = repeat === 'repeat-y';
         var child;
         if (isImagePattern(val)) {
             var imageWidth_1 = val.imageWidth;
@@ -39228,8 +39305,20 @@
                 var setSizeToVNode_1 = function (vNode, img) {
                     if (vNode) {
                         var svgEl = vNode.elm;
-                        var width = (vNode.attrs.width = imageWidth_1 || img.width);
-                        var height = (vNode.attrs.height = imageHeight_1 || img.height);
+                        var width = imageWidth_1 || img.width;
+                        var height = imageHeight_1 || img.height;
+                        if (vNode.tag === 'pattern') {
+                            if (repeatX) {
+                                height = 1;
+                                width /= boundingRect.width;
+                            }
+                            else if (repeatY) {
+                                width = 1;
+                                height /= boundingRect.height;
+                            }
+                        }
+                        vNode.attrs.width = width;
+                        vNode.attrs.height = height;
                         if (svgEl) {
                             svgEl.setAttribute('width', width);
                             svgEl.setAttribute('height', height);
@@ -39237,7 +39326,7 @@
                     }
                 };
                 var createdImage = createOrUpdateImage(imageSrc, null, el, function (img) {
-                    setSizeToVNode_1(patternVNode, img);
+                    noRepeat || setSizeToVNode_1(patternVNode, img);
                     setSizeToVNode_1(child, img);
                 });
                 if (createdImage && createdImage.width && createdImage.height) {
@@ -39261,7 +39350,30 @@
         if (!child) {
             return;
         }
-        patternAttrs.patternTransform = getSRTTransformString(val);
+        var patternWidth;
+        var patternHeight;
+        if (noRepeat) {
+            patternWidth = patternHeight = 1;
+        }
+        else if (repeatX) {
+            patternHeight = 1;
+            patternWidth = patternAttrs.width / boundingRect.width;
+        }
+        else if (repeatY) {
+            patternWidth = 1;
+            patternHeight = patternAttrs.height / boundingRect.height;
+        }
+        else {
+            patternAttrs.patternUnits = 'userSpaceOnUse';
+        }
+        if (patternWidth != null && !isNaN(patternWidth)) {
+            patternAttrs.width = patternWidth;
+        }
+        if (patternHeight != null && !isNaN(patternHeight)) {
+            patternAttrs.height = patternHeight;
+        }
+        var patternTransform = getSRTTransformString(val);
+        patternTransform && (patternAttrs.patternTransform = patternTransform);
         var patternVNode = createVNode('pattern', '', patternAttrs, [child]);
         var patternKey = vNodeToString(patternVNode);
         var patternCache = scope.patternCache;
@@ -39613,7 +39725,6 @@
         SVGPainter.prototype.renderToVNode = function (opts) {
             opts = opts || {};
             var list = this.storage.getDisplayList(true);
-            var bgColor = this._backgroundColor;
             var width = this._width;
             var height = this._height;
             var scope = createBrushScope(this._id);
@@ -39621,22 +39732,8 @@
             scope.willUpdate = opts.willUpdate;
             scope.compress = opts.compress;
             var children = [];
-            if (bgColor && bgColor !== 'none') {
-                var _a = normalizeColor(bgColor), color = _a.color, opacity = _a.opacity;
-                this._bgVNode = createVNode('rect', 'bg', {
-                    width: width,
-                    height: height,
-                    x: '0',
-                    y: '0',
-                    id: '0',
-                    fill: color,
-                    'fill-opacity': opacity
-                });
-                children.push(this._bgVNode);
-            }
-            else {
-                this._bgVNode = null;
-            }
+            var bgVNode = this._bgVNode = createBackgroundVNode(width, height, this._backgroundColor, scope);
+            bgVNode && children.push(bgVNode);
             var mainVNode = !opts.compress
                 ? (this._mainVNode = createVNode('g', 'main', {}, [])) : null;
             this._paintList(list, scope, mainVNode ? mainVNode.children : children);
@@ -39665,14 +39762,6 @@
         };
         SVGPainter.prototype.setBackgroundColor = function (backgroundColor) {
             this._backgroundColor = backgroundColor;
-            var bgVNode = this._bgVNode;
-            if (bgVNode && bgVNode.elm) {
-                var _a = normalizeColor(backgroundColor), color = _a.color, opacity = _a.opacity;
-                bgVNode.elm.setAttribute('fill', color);
-                if (opacity < 1) {
-                    bgVNode.elm.setAttribute('fill-opacity', opacity);
-                }
-            }
         };
         SVGPainter.prototype.getSvgRoot = function () {
             return this._mainVNode && this._mainVNode.elm;
@@ -39737,10 +39826,20 @@
                     viewportStyle.width = width + 'px';
                     viewportStyle.height = height + 'px';
                 }
-                var svgDom = this._svgDom;
-                if (svgDom) {
-                    svgDom.setAttribute('width', width);
-                    svgDom.setAttribute('height', height);
+                if (!isPattern(this._backgroundColor)) {
+                    var svgDom = this._svgDom;
+                    if (svgDom) {
+                        svgDom.setAttribute('width', width);
+                        svgDom.setAttribute('height', height);
+                    }
+                    var bgEl = this._bgVNode && this._bgVNode.elm;
+                    if (bgEl) {
+                        bgEl.setAttribute('width', width);
+                        bgEl.setAttribute('height', height);
+                    }
+                }
+                else {
+                    this.refresh();
                 }
             }
         };
@@ -39768,13 +39867,13 @@
             this._oldVNode = null;
         };
         SVGPainter.prototype.toDataURL = function (base64) {
-            var str = encodeURIComponent(this.renderToString());
+            var str = this.renderToString();
             var prefix = 'data:image/svg+xml;';
             if (base64) {
                 str = encodeBase64(str);
                 return str && prefix + 'base64,' + str;
             }
-            return prefix + 'charset=UTF-8,' + str;
+            return prefix + 'charset=UTF-8,' + encodeURIComponent(str);
         };
         return SVGPainter;
     }());
@@ -39784,6 +39883,36 @@
                 logError('In SVG mode painter not support method "' + method + '"');
             }
         };
+    }
+    function createBackgroundVNode(width, height, backgroundColor, scope) {
+        var bgVNode;
+        if (backgroundColor && backgroundColor !== 'none') {
+            bgVNode = createVNode('rect', 'bg', {
+                width: width,
+                height: height,
+                x: '0',
+                y: '0',
+                id: '0'
+            });
+            if (isGradient(backgroundColor)) {
+                setGradient({ fill: backgroundColor }, bgVNode.attrs, 'fill', scope);
+            }
+            else if (isPattern(backgroundColor)) {
+                setPattern({
+                    style: {
+                        fill: backgroundColor
+                    },
+                    dirty: noop,
+                    getBoundingRect: function () { return ({ width: width, height: height }); }
+                }, bgVNode.attrs, 'fill', scope);
+            }
+            else {
+                var _a = normalizeColor(backgroundColor), color = _a.color, opacity = _a.opacity;
+                bgVNode.attrs.fill = color;
+                opacity < 1 && (bgVNode.attrs['fill-opacity'] = opacity);
+            }
+        }
+        return bgVNode;
     }
 
     function install(registers) {
@@ -39808,7 +39937,7 @@
         return newDom;
     }
     var Layer = (function (_super) {
-        __extends(Layer, _super);
+        __extends$1(Layer, _super);
         function Layer(id, painter, dpr) {
             var _this = _super.call(this) || this;
             _this.motionBlur = false;
@@ -40028,7 +40157,10 @@
                 if (clearColor && clearColor !== 'transparent') {
                     var clearColorGradientOrPattern = void 0;
                     if (isGradientObject(clearColor)) {
-                        clearColorGradientOrPattern = clearColor.__canvasGradient
+                        var shouldCache = clearColor.global || (clearColor.__width === width
+                            && clearColor.__height === height);
+                        clearColorGradientOrPattern = shouldCache
+                            && clearColor.__canvasGradient
                             || getCanvasGradient(ctx, clearColor, {
                                 x: 0,
                                 y: 0,
@@ -40036,6 +40168,8 @@
                                 height: height
                             });
                         clearColor.__canvasGradient = clearColorGradientOrPattern;
+                        clearColor.__width = width;
+                        clearColor.__height = height;
                     }
                     else if (isImagePatternObject(clearColor)) {
                         clearColor.scaleX = clearColor.scaleX || dpr;
@@ -41393,7 +41527,7 @@
       var stackResultDim = data.getCalculationInfo('stackResultDimension');
 
       if (isDimensionStacked(data, dims[0]
-      /*, dims[1]*/
+      /* , dims[1] */
       )) {
         // jshint ignore:line
         stacked = true;
@@ -41401,7 +41535,7 @@
       }
 
       if (isDimensionStacked(data, dims[1]
-      /*, dims[0]*/
+      /* , dims[0] */
       )) {
         // jshint ignore:line
         stacked = true;
@@ -43539,18 +43673,42 @@
         });
       };
 
-      BaseBarSeriesModel.prototype.getMarkerPosition = function (value) {
+      BaseBarSeriesModel.prototype.getMarkerPosition = function (value, dims, startingAtTick) {
+        if (startingAtTick === void 0) {
+          startingAtTick = false;
+        }
+
         var coordSys = this.coordinateSystem;
 
         if (coordSys && coordSys.clampData) {
           // PENDING if clamp ?
-          var pt = coordSys.dataToPoint(coordSys.clampData(value));
-          var data = this.getData();
-          var offset = data.getLayout('offset');
-          var size = data.getLayout('size');
-          var offsetIndex = coordSys.getBaseAxis().isHorizontal() ? 0 : 1;
-          pt[offsetIndex] += offset + size / 2;
-          return pt;
+          var pt_1 = coordSys.dataToPoint(coordSys.clampData(value));
+
+          if (startingAtTick) {
+            each(coordSys.getAxes(), function (axis, idx) {
+              // If axis type is category, use tick coords instead
+              if (axis.type === 'category') {
+                var tickCoords = axis.getTicksCoords();
+                var tickIdx = coordSys.clampData(value)[idx]; // The index of rightmost tick of markArea is 1 larger than x1/y1 index
+
+                if (dims && (dims[idx] === 'x1' || dims[idx] === 'y1')) {
+                  tickIdx += 1;
+                }
+
+                tickIdx > tickCoords.length - 1 && (tickIdx = tickCoords.length - 1);
+                tickIdx < 0 && (tickIdx = 0);
+                tickCoords[tickIdx] && (pt_1[idx] = axis.toGlobalCoord(tickCoords[tickIdx].coord));
+              }
+            });
+          } else {
+            var data = this.getData();
+            var offset = data.getLayout('offset');
+            var size = data.getLayout('size');
+            var offsetIndex = coordSys.getBaseAxis().isHorizontal() ? 0 : 1;
+            pt_1[offsetIndex] += offset + size / 2;
+          }
+
+          return pt_1;
         }
 
         return [NaN, NaN];
@@ -45457,8 +45615,13 @@
 
         if (Math.abs(sectorShape.endAngle - sectorShape.startAngle) < minShowLabelRadian) {
           each(label.states, setNotShow);
-          each(labelLine.states, setNotShow);
-          label.ignore = labelLine.ignore = true;
+          label.ignore = true;
+
+          if (labelLine) {
+            each(labelLine.states, setNotShow);
+            labelLine.ignore = true;
+          }
+
           return;
         }
 
@@ -46031,6 +46194,8 @@
       return LegendVisualProvider;
     }();
 
+    var innerData = makeInner();
+
     var PieSeriesModel =
     /** @class */
     function (_super) {
@@ -46067,16 +46232,10 @@
 
 
       PieSeriesModel.prototype.getInitialData = function () {
-        var data = createSeriesDataSimply(this, {
+        return createSeriesDataSimply(this, {
           coordDimensions: ['value'],
           encodeDefaulter: curry(makeSeriesEncodeForNameBased, this)
         });
-        var valueList = [];
-        data.each(data.mapDimension('value'), function (value) {
-          valueList.push(value);
-        });
-        this.seats = getPercentSeats(valueList, data.hostModel.get('percentPrecision'));
-        return data;
       };
       /**
        * @overwrite
@@ -46084,9 +46243,23 @@
 
 
       PieSeriesModel.prototype.getDataParams = function (dataIndex) {
-        var params = _super.prototype.getDataParams.call(this, dataIndex);
+        var data = this.getData(); // update seats when data is changed
 
-        params.percent = this.seats[dataIndex];
+        var dataInner = innerData(data);
+        var seats = dataInner.seats;
+
+        if (!seats) {
+          var valueList_1 = [];
+          data.each(data.mapDimension('value'), function (value) {
+            valueList_1.push(value);
+          });
+          seats = dataInner.seats = getPercentSeats(valueList_1, data.hostModel.get('percentPrecision'));
+        }
+
+        var params = _super.prototype.getDataParams.call(this, dataIndex); // seats may be empty when sum is 0
+
+
+        params.percent = seats[dataIndex] || 0;
         params.$vars.push('percent');
         return params;
       };
@@ -46150,8 +46323,8 @@
           // Works only position is 'outer' and alignTo is not 'edge'.
           bleedMargin: 10,
           // Distance between text and label line.
-          distanceToLabelLine: 5 // formatter: 标签文本格式器，同Tooltip.formatter，不支持异步回调
-          // 默认使用全局文本样式，详见TEXTSTYLE
+          distanceToLabelLine: 5 // formatter: 标签文本格式器，同 tooltip.formatter，不支持异步回调
+          // 默认使用全局文本样式，详见 textStyle
           // distance: 当position为inner时有效，为label位置到圆心的距离与圆半径(环状图为内外半径和)的比例系数
 
         },
@@ -47768,7 +47941,7 @@
         var axesCount = {
           x: 0,
           y: 0
-        }; /// Create axis
+        }; // Create axis
 
         ecModel.eachComponent('xAxis', createAxisCreator('x'), this);
         ecModel.eachComponent('yAxis', createAxisCreator('y'), this);
@@ -47780,7 +47953,7 @@
           return;
         }
 
-        this._axesMap = axesMap; /// Create cartesian2d
+        this._axesMap = axesMap; // Create cartesian2d
 
         each(axesMap.x, function (xAxis, xAxisIndex) {
           each(axesMap.y, function (yAxis, yAxisIndex) {
@@ -51270,7 +51443,7 @@
      * no common parents but both of them need to display label "lung" inside.
      */
 
-    var REGION_AVAILABLE_SVG_TAG_MAP = createHashMap(['rect', 'circle', 'line', 'ellipse', 'polygon', 'polyline', 'path', // <text> <tspan> are also enabled becuase some SVG might paint text itself,
+    var REGION_AVAILABLE_SVG_TAG_MAP = createHashMap(['rect', 'circle', 'line', 'ellipse', 'polygon', 'polyline', 'path', // <text> <tspan> are also enabled because some SVG might paint text itself,
     // but still need to trigger events or tooltip.
     'text', 'tspan', // <g> is also enabled because this case: if multiple tags share one name
     // and need label displayed, every tags will display the name, which is not
@@ -51468,7 +51641,7 @@
 
 
       GeoSVGResource.prototype.useGraphic = function (hostKey
-      /*, nameMap: NameMap */
+      /* , nameMap: NameMap */
       ) {
         var usedRootMap = this._usedGraphicMap;
         var svgGraphic = usedRootMap.get(hostKey);
@@ -51642,7 +51815,7 @@
       '广东': [0, -10],
       '香港': [10, 5],
       '澳门': [-10, 10],
-      //'北京': [-10, 0],
+      // '北京': [-10, 0],
       '天津': [5, 5]
     };
     function fixTextCoords(mapType, region) {
@@ -52369,7 +52542,7 @@
        * `ignore` might have been modified by `LabelManager`, and `LabelManager#addLabelsOfSeries`
        * will subsequently cache `defaultAttr` like `ignore`. If do not do this reset, the modified
        * props will have no chance to be restored.
-       * Note: this reset should be after `clearStates` in `renderSeries` becuase `useStates` in
+       * Note: This reset should be after `clearStates` in `renderSeries` because `useStates` in
        * `renderSeries` will cache the modified `ignore` to `el._normalState`.
        * TODO:
        * Use clone/immutable in `LabelManager`?
@@ -52409,7 +52582,7 @@
     }();
 
     function applyOptionStyleForRegion(viewBuildCtx, el, dataIndex, regionModel) {
-      // All of the path are using `itemStyle`, becuase
+      // All of the path are using `itemStyle`, because
       // (1) Some SVG also use fill on polyline (The different between
       // polyline and polygon is "open" or "close" but not fill or not).
       // (2) For the common props like opacity, if some use itemStyle
@@ -52942,7 +53115,7 @@
         // for geoSVG source: 1,
         // for geoJSON source: 0.75.
         aspectScale: null,
-        ///// Layout with center and size
+        // Layout with center and size
         // If you wan't to put map in a fixed size box with right aspect ratio
         // This two properties may more conveninet
         // layoutCenter: [50%, 50%]
@@ -53268,9 +53441,9 @@
 
       View.prototype.getTransformInfo = function () {
         var rawTransformable = this._rawTransformable;
-        var roamTransformable = this._roamTransformable; // Becuase roamTransformabel has `originX/originY` modified,
+        var roamTransformable = this._roamTransformable; // Because roamTransformabel has `originX/originY` modified,
         // but the caller of `getTransformInfo` can not handle `originX/originY`,
-        // so need to recalcualte them.
+        // so need to recalculate them.
 
         var dummyTransformable = new Transformable();
         dummyTransformable.transform = roamTransformable.transform;
@@ -53901,7 +54074,7 @@
         // for geoSVG source: 1,
         // for geoJSON source: 0.75.
         aspectScale: null,
-        ///// Layout with center and size
+        // /// Layout with center and size
         // If you wan't to put map in a fixed size box with right aspect ratio
         // This two properties may more conveninet
         // layoutCenter: [50%, 50%]
@@ -55715,7 +55888,7 @@
 
 
       TreeSeriesModel.prototype.getInitialData = function (option) {
-        //create an virtual root
+        // create a virtual root
         var root = {
           name: option.name,
           children: option.data
@@ -56376,7 +56549,7 @@
           },
           emphasis: {
             itemStyle: {
-              color: 'rgba(0,0,0,0.9)' //'#5793f3',
+              color: 'rgba(0,0,0,0.9)' // '#5793f3',
 
             }
           }
@@ -57793,7 +57966,7 @@
         return VisualMapping.visualHandlers.hasOwnProperty(visualType);
       };
       /**
-       * Convinent method.
+       * Convenient method.
        * Visual can be Object or Array or primary type.
        */
 
@@ -61838,6 +62011,7 @@
         endAngle = angles[1];
         var angleRangeSpan = endAngle - startAngle;
         var prevEndAngle = startAngle;
+        var sectors = [];
 
         for (var i = 0; showAxis && i < colorList.length; i++) {
           // Clamp
@@ -61861,9 +62035,14 @@
           sector.setStyle(lineStyleModel.getLineStyle( // Because we use sector to simulate arc
           // so the properties for stroking are useless
           ['color', 'width']));
-          group.add(sector);
+          sectors.push(sector);
           prevEndAngle = endAngle;
         }
+
+        sectors.reverse();
+        each(sectors, function (sector) {
+          return group.add(sector);
+        });
 
         var getColor = function (percent) {
           // Less than 0
@@ -62476,6 +62655,54 @@
     }
 
     var opacityAccessPath = ['itemStyle', 'opacity'];
+    var rateLabelFetcher = {
+      getFormattedLabel: function ( // In MapDraw case it can be string (region name)
+      labelDataIndex, status, dataType, labelDimIndex, formatter, // If provided, the implementation of `getFormattedLabel` can use it
+      // to generate the final label text.
+      extendParams) {
+        status = status || 'normal';
+
+        var _a = this,
+            hostModel = _a.hostModel,
+            layout = _a.layout;
+
+        var data = hostModel.getData(dataType);
+
+        if (!formatter) {
+          var itemModel = data.getItemModel(labelDataIndex); // @ts-ignore
+
+          formatter = itemModel.get(status === 'normal' ? ['rateLabel', 'formatter'] : [status, 'rateLabel', 'formatter']);
+        }
+
+        var rate = layout.rate,
+            isLastPiece = layout.isLastPiece,
+            nextName = layout.nextName,
+            preName = layout.preName,
+            preDataIndex = layout.preDataIndex,
+            nextDataIndex = layout.nextDataIndex;
+
+        if (isLastPiece) {
+          var itemModel = data.getItemModel(labelDataIndex); // @ts-ignore
+
+          formatter = itemModel.get(status === 'normal' ? ['overallRateLabel', 'formatter'] : [status, 'overallRateLabel', 'formatter']);
+        }
+
+        var params = {
+          rate: rate,
+          preName: preName,
+          nextName: nextName,
+          preDataIndex: preDataIndex,
+          nextDataIndex: nextDataIndex,
+          formatter: formatter
+        };
+
+        if (isFunction(formatter)) {
+          return formatter(params);
+        }
+
+        return '';
+      }
+    };
     /**
      * Piece of pie including Sector, Label, LabelLine
      */
@@ -62484,8 +62711,12 @@
     /** @class */
     function (_super) {
       __extends(FunnelPiece, _super);
+      /**
+       * @param type judge is data blocks or conversion blocks
+       */
 
-      function FunnelPiece(data, idx) {
+
+      function FunnelPiece(data, idx, type) {
         var _this = _super.call(this) || this;
 
         var polygon = _this;
@@ -62495,12 +62726,12 @@
 
         _this.setTextGuideLine(labelLine);
 
-        _this.updateData(data, idx, true);
+        _this.updateData(data, idx, type, true);
 
         return _this;
       }
 
-      FunnelPiece.prototype.updateData = function (data, idx, firstCreate) {
+      FunnelPiece.prototype.updateData = function (data, idx, type, firstCreate) {
         var polygon = this;
         var seriesModel = data.hostModel;
         var itemModel = data.getItemModel(idx);
@@ -62509,17 +62740,31 @@
         var opacity = itemModel.get(opacityAccessPath);
         opacity = opacity == null ? 1 : opacity;
 
+        if (type === 'rate') {
+          // the opacity of rate piece is half of data
+          opacity /= 2;
+        }
+
         if (!firstCreate) {
           saveOldStyle(polygon);
+        } // hide the last rate piece and when it not the last one show it again
+
+
+        polygon.invisible = false;
+
+        if (layout.isLastPiece && type === 'rate') {
+          // hide last rate piece
+          polygon.invisible = true;
         } // Update common style
 
 
         polygon.useStyle(data.getItemVisual(idx, 'style'));
         polygon.style.lineJoin = 'round';
+        var points = type === 'data' ? layout.points : layout.ratePoints;
 
         if (firstCreate) {
           polygon.setShape({
-            points: layout.points
+            points: points
           });
           polygon.style.opacity = 0;
           initProps(polygon, {
@@ -62533,34 +62778,49 @@
               opacity: opacity
             },
             shape: {
-              points: layout.points
+              points: points
             }
           }, seriesModel, idx);
         }
 
+        this._updateLabel(data, idx, type);
+
         setStatesStylesFromModel(polygon, itemModel);
 
-        this._updateLabel(data, idx);
-
-        toggleHoverEmphasis(this, emphasisModel.get('focus'), emphasisModel.get('blurScope'), emphasisModel.get('disabled'));
+        if (type === 'data') {
+          toggleHoverEmphasis(this, emphasisModel.get('focus'), emphasisModel.get('blurScope'), emphasisModel.get('disabled'));
+        }
       };
 
-      FunnelPiece.prototype._updateLabel = function (data, idx) {
+      FunnelPiece.prototype._updateLabel = function (data, idx, type) {
         var polygon = this;
         var labelLine = this.getTextGuideLine();
         var labelText = polygon.getTextContent();
         var seriesModel = data.hostModel;
         var itemModel = data.getItemModel(idx);
         var layout = data.getItemLayout(idx);
-        var labelLayout = layout.label;
+        var labelLayout = layout[type === 'data' ? 'label' : 'rateLabel'];
         var style = data.getItemVisual(idx, 'style');
-        var visualColor = style.fill;
+        var visualColor = style.fill; // bind this to data of rateLabelFetherFunc
+
+        var rateFetcher; // clone default fechter
+
+        if (type === 'rate') {
+          rateFetcher = {
+            getFormattedLabel: rateLabelFetcher.getFormattedLabel.bind({
+              hostModel: data.hostModel,
+              layout: layout
+            })
+          };
+        }
+
+        var rateLabel = layout.isLastPiece ? 'overallRateLabel' : 'rateLabel';
         setLabelStyle( // position will not be used in setLabelStyle
-        labelText, getLabelStatesModels(itemModel), {
-          labelFetcher: data.hostModel,
+        labelText, getLabelStatesModels(itemModel, type === 'data' ? undefined : rateLabel), {
+          labelFetcher: type === 'data' ? data.hostModel : rateFetcher,
           labelDataIndex: idx,
           defaultOpacity: style.opacity,
-          defaultText: data.getName(idx)
+          defaultText: type === 'data' ? data.getName(idx) : layout.rate
         }, {
           normal: {
             align: labelLayout.textAlign,
@@ -62620,19 +62880,50 @@
       FunnelView.prototype.render = function (seriesModel, ecModel, api) {
         var data = seriesModel.getData();
         var oldData = this._data;
-        var group = this.group;
+        var group = this.group; // rate in other two mode did not support yet
+
+        var showRate = seriesModel.get('showRate') && !(seriesModel.get('dynamicHeight') || seriesModel.get('sort') === 'none');
         data.diff(oldData).add(function (idx) {
-          var funnelPiece = new FunnelPiece(data, idx);
+          var funnelPiece = new FunnelPiece(data, idx, 'data');
           data.setItemGraphicEl(idx, funnelPiece);
           group.add(funnelPiece);
+
+          if (showRate) {
+            var ratePiece = new FunnelPiece(data, idx, 'rate');
+            group.add(ratePiece);
+            funnelPiece.ratePiece = ratePiece;
+          }
         }).update(function (newIdx, oldIdx) {
           var piece = oldData.getItemGraphicEl(oldIdx);
-          piece.updateData(data, newIdx);
+          piece.updateData(data, newIdx, 'data');
           group.add(piece);
-          data.setItemGraphicEl(newIdx, piece);
+          data.setItemGraphicEl(newIdx, piece); // rate funnel piece may remove in this mount func
+
+          var ratePiece = piece.ratePiece;
+
+          if (showRate) {
+            if (ratePiece) {
+              ratePiece.updateData(data, newIdx, 'rate');
+              group.add(ratePiece);
+            } else {
+              var ratePiece_1 = new FunnelPiece(data, newIdx, 'rate');
+              group.add(ratePiece_1);
+              piece.ratePiece = ratePiece_1;
+            }
+          } else {
+            if (ratePiece) {
+              removeElementWithFadeOut(ratePiece, seriesModel, oldIdx);
+              piece.ratePiece = null;
+            }
+          }
         }).remove(function (idx) {
           var piece = oldData.getItemGraphicEl(idx);
           removeElementWithFadeOut(piece, seriesModel, idx);
+
+          if (showRate) {
+            var ratePiece = piece.ratePiece;
+            removeElementWithFadeOut(ratePiece, seriesModel, idx);
+          }
         }).execute();
         this._data = data;
       };
@@ -62726,6 +63017,14 @@
           show: true,
           position: 'outer' // formatter: 标签文本格式器，同Tooltip.formatter，不支持异步回调
 
+        },
+        rateLabel: {
+          show: true,
+          precision: 2
+        },
+        overallRateLabel: {
+          show: true,
+          precision: 2
         },
         labelLine: {
           show: true,
@@ -62958,19 +63257,64 @@
       });
     }
 
+    function rateLabelLayout(data) {
+      data.each(function (idx) {
+        var layout = data.getItemLayout(idx);
+        var points = layout.ratePoints;
+        var isLabelInside = true;
+        var textX = (points[0][0] + points[1][0] + points[2][0] + points[3][0]) / 4;
+        var textY = (points[0][1] + points[1][1] + points[2][1] + points[3][1]) / 4;
+        var textAlign = 'center';
+        var linePoints = [[textX, textY], [textX, textY]];
+        layout.rateLabel = {
+          linePoints: linePoints,
+          x: textX,
+          y: textY,
+          verticalAlign: 'middle',
+          textAlign: textAlign,
+          inside: isLabelInside
+        };
+      });
+    }
+
     function funnelLayout(ecModel, api) {
       ecModel.eachSeriesByType('funnel', function (seriesModel) {
+        // data about
         var data = seriesModel.getData();
         var valueDim = data.mapDimension('value');
+        var valueArr = data.mapArray(valueDim, function (val) {
+          return val;
+        });
+        var valueSum = valueArr.reduce(function (pre, cur) {
+          return pre + cur;
+        }); // direction about
+
         var sort = seriesModel.get('sort');
+        var orient = seriesModel.get('orient'); // size and pos about
+
         var viewRect = getViewRect$3(seriesModel, api);
-        var orient = seriesModel.get('orient');
         var viewWidth = viewRect.width;
         var viewHeight = viewRect.height;
-        var indices = getSortedIndices(data, sort);
         var x = viewRect.x;
         var y = viewRect.y;
-        var sizeExtent = orient === 'horizontal' ? [parsePercent$1(seriesModel.get('minSize'), viewHeight), parsePercent$1(seriesModel.get('maxSize'), viewHeight)] : [parsePercent$1(seriesModel.get('minSize'), viewWidth), parsePercent$1(seriesModel.get('maxSize'), viewWidth)];
+        var indices = getSortedIndices(data, sort);
+        var gap = seriesModel.get('gap');
+        var gapSum = gap * (data.count() - 1); // mapping mode about
+
+        var dynamicHeight = seriesModel.get('dynamicHeight');
+        var showRate = seriesModel.get('showRate'); // size extent based on orient and mapping mode
+        // determine the width extent of the funnel piece  when dynamicHeight is false
+        // determine the height extent of the funnel piece when dynamicHeight if true
+
+        var isHorizontal = orient === 'horizontal';
+        var size = dynamicHeight ? isHorizontal ? viewWidth - gapSum : viewHeight - gapSum : isHorizontal ? viewHeight : viewWidth;
+        var sizeExtent = [parsePercent$1(seriesModel.get('minSize'), size), size];
+
+        if (!dynamicHeight) {
+          sizeExtent[1] = parsePercent$1(seriesModel.get('maxSize'), size);
+        } // data extent
+
+
         var dataExtent = data.getDataExtent(valueDim);
         var min = seriesModel.get('min');
         var max = seriesModel.get('max');
@@ -62981,18 +63325,36 @@
 
         if (max == null) {
           max = dataExtent[1];
+        } // determine the height of the funnel
+
+
+        var viewSize = dynamicHeight ? isHorizontal ? viewHeight : viewWidth : isHorizontal ? viewWidth : viewHeight;
+        var itemSize = (viewSize - gapSum) / data.count();
+
+        if (dynamicHeight) {
+          viewSize = parsePercent$1(seriesModel.get('maxSize'), viewSize);
         }
 
-        var funnelAlign = seriesModel.get('funnelAlign');
-        var gap = seriesModel.get('gap');
-        var viewSize = orient === 'horizontal' ? viewWidth : viewHeight;
-        var itemSize = (viewSize - gap * (data.count() - 1)) / data.count();
+        var funnelAlign = seriesModel.get('funnelAlign'); // adjust related param
 
-        var getLinePoints = function (idx, offset) {
-          // End point index is data.count() and we assign it 0
+        if (sort === 'ascending') {
+          // From bottom to top
+          itemSize = -itemSize;
+          gap = -gap;
+
           if (orient === 'horizontal') {
-            var val_1 = data.get(valueDim, idx) || 0;
-            var itemHeight = linearMap(val_1, [min, max], sizeExtent, true);
+            x += viewWidth;
+          } else {
+            y += viewHeight;
+          }
+
+          indices = indices.reverse();
+        }
+
+        var getLinePoints = function (offset, itemSize) {
+          // do not caculate line width in this func
+          if (orient === 'horizontal') {
+            var itemHeight = itemSize;
             var y0 = void 0;
 
             switch (funnelAlign) {
@@ -63012,8 +63374,7 @@
             return [[offset, y0], [offset, y0 + itemHeight]];
           }
 
-          var val = data.get(valueDim, idx) || 0;
-          var itemWidth = linearMap(val, [min, max], sizeExtent, true);
+          var itemWidth = itemSize;
           var x0;
 
           switch (funnelAlign) {
@@ -63033,19 +63394,160 @@
           return [[x0, offset], [x0 + itemWidth, offset]];
         };
 
-        if (sort === 'ascending') {
-          // From bottom to top
-          itemSize = -itemSize;
-          gap = -gap;
+        var getItemSize = function (idx) {
+          var itemVal = data.get(valueDim, idx) || 0;
+          var itemSize = linearMap(itemVal, [min, max], sizeExtent, true);
+          return itemSize;
+        }; // exit shape control
 
-          if (orient === 'horizontal') {
-            x += viewWidth;
+
+        var exitWidth = parsePercent$1(seriesModel.get('exitWidth'), 100); // dy height funnel piece about
+
+        var setDynamicHeightPoints = null;
+
+        if (dynamicHeight) {
+          setDynamicHeightPoints = function () {
+            var dyminSize = parsePercent$1(seriesModel.get('minSize'), 100);
+            var dymaxSize = dyminSize < 100 ? sizeExtent[1] * 100 / (100 - dyminSize) : sizeExtent[1];
+            var resSize = dymaxSize;
+            return function (index, idx, pos, pieceHeight) {
+              var start = getLinePoints(pos, resSize / dymaxSize * viewSize);
+              index === indices.length - 1 && exitWidth === 100 || (resSize += sort === 'ascending' ? pieceHeight : -pieceHeight);
+              var end = getLinePoints(pos + pieceHeight, resSize / dymaxSize * viewSize);
+              data.setItemLayout(idx, {
+                points: start.concat(end.slice().reverse())
+              });
+            };
+          }();
+        } // rate funnel about
+
+
+        var setRatePiecePoint = null;
+
+        if (showRate) {
+          var getConverRate_1 = function () {
+            var firstVal;
+            var firstName;
+            var firstDataIndex; // get rate fixed decimal places
+
+            var ratePrecision = seriesModel.get(['rateLabel', 'precision']);
+            var overallRatePrecision = seriesModel.get(['overallRateLabel', 'precision']);
+            return function (index, idx, nextIdx) {
+              var val = data.get(valueDim, idx) || 0;
+              var nextVal = data.get(valueDim, nextIdx) || 0;
+              var preName = data.getName(idx);
+              var nextName = data.getName(nextIdx);
+              var preDataIndex = idx;
+              var nextDataIndex = nextIdx;
+              var rate = nextVal / val;
+              rate = (rate * 100).toFixed(ratePrecision) + '%';
+
+              if (index === 0) {
+                firstVal = val;
+                firstName = data.getName(idx);
+                firstDataIndex = idx;
+              } else if (index === indices.length - 1) {
+                var lastVal = val;
+                rate = lastVal / firstVal;
+                rate = (rate * 100).toFixed(overallRatePrecision) + '%';
+                nextName = preName;
+                preName = firstName;
+                preDataIndex = firstDataIndex;
+                nextDataIndex = idx;
+              }
+
+              preDataIndex = preDataIndex + 1;
+              nextDataIndex = nextDataIndex + 1;
+              return {
+                rate: rate,
+                nextName: nextName,
+                preName: preName,
+                preDataIndex: preDataIndex,
+                nextDataIndex: nextDataIndex
+              };
+            };
+          }();
+
+          setRatePiecePoint = function (index, idx, nextIdx, pos, pieceHeight) {
+            // get this size
+            var itemSize = getItemSize(idx);
+            var exitSize = itemSize;
+
+            if (exitWidth != null && index === indices.length - 1) {
+              exitSize = itemSize * (exitWidth > 100 ? 100 : exitWidth) / 100;
+            } // data piece
+
+
+            var dataStart = getLinePoints(pos, itemSize);
+            var dataEnd = getLinePoints(pos + pieceHeight / 2, exitSize); // rate piece
+
+            var nextSize = getItemSize(index === indices.length - 1 && exitWidth === 100 ? idx : nextIdx);
+            var rateStart = getLinePoints(pos + pieceHeight / 2, itemSize);
+            var rateEnd = getLinePoints(pos + pieceHeight, nextSize); // rate string about
+
+            var _a = getConverRate_1(index, idx, nextIdx),
+                rate = _a.rate,
+                nextName = _a.nextName,
+                preName = _a.preName,
+                preDataIndex = _a.preDataIndex,
+                nextDataIndex = _a.nextDataIndex;
+
+            data.setItemLayout(idx, {
+              points: dataStart.concat(dataEnd.slice().reverse()),
+              ratePoints: rateStart.concat(rateEnd.slice().reverse()),
+              isLastPiece: index === indices.length - 1,
+              rate: rate,
+              nextName: nextName,
+              preName: preName,
+              preDataIndex: preDataIndex,
+              nextDataIndex: nextDataIndex
+            });
+          };
+        } // get the height of funnel piece
+
+
+        var getPieceHeight = function (pieceHeight, idx) {
+          // get funnel piece height pass to getLinePoints func based on data value
+          var val = data.get(valueDim, idx) || 0;
+
+          if (dynamicHeight) {
+            // in dy height, user can't set itemHeight or itemWidth
+            pieceHeight = linearMap(val, [0, valueSum], [0, size], true);
+            pieceHeight = sort === 'ascending' ? -pieceHeight : pieceHeight;
+            return pieceHeight;
+          } // default mapping or show rate pieceHeight
+
+
+          if (pieceHeight == null) {
+            pieceHeight = itemSize;
           } else {
-            y += viewHeight;
+            pieceHeight = parsePercent$1(pieceHeight, orient === 'horizontal' ? viewWidth : viewHeight);
+            pieceHeight = sort === 'ascending' ? -pieceHeight : pieceHeight;
           }
 
-          indices = indices.reverse();
-        }
+          return pieceHeight;
+        }; // set the line piont of the funnel piece
+
+
+        var setLayoutPoints = function (index, idx, nextIdx, pieceHeight, pos) {
+          // The subsequent funnel shape modification will be done in this func.
+          // We don’t need to concern direction when we use this function to set points.
+          if (dynamicHeight) {
+            setDynamicHeightPoints(index, idx, pos, pieceHeight);
+            return;
+          } else if (showRate && sort !== 'none') {
+            setRatePiecePoint(index, idx, nextIdx, pos, pieceHeight);
+            return;
+          }
+
+          var start = getLinePoints(pos, getItemSize(idx)); // get end line width;
+
+          var nIdx = index === indices.length - 1 && exitWidth === 100 ? idx : nextIdx;
+          var end = getLinePoints(pos + pieceHeight, getItemSize(nIdx));
+          data.setItemLayout(idx, {
+            points: start.concat(end.slice().reverse())
+          });
+        };
 
         for (var i = 0; i < indices.length; i++) {
           var idx = indices[i];
@@ -63053,47 +63555,21 @@
           var itemModel = data.getItemModel(idx);
 
           if (orient === 'horizontal') {
-            var width = itemModel.get(['itemStyle', 'width']);
-
-            if (width == null) {
-              width = itemSize;
-            } else {
-              width = parsePercent$1(width, viewWidth);
-
-              if (sort === 'ascending') {
-                width = -width;
-              }
-            }
-
-            var start = getLinePoints(idx, x);
-            var end = getLinePoints(nextIdx, x + width);
+            var width = getPieceHeight(itemModel.get(['itemStyle', 'width']), idx);
+            setLayoutPoints(i, idx, nextIdx, width, x);
             x += width + gap;
-            data.setItemLayout(idx, {
-              points: start.concat(end.slice().reverse())
-            });
           } else {
-            var height = itemModel.get(['itemStyle', 'height']);
-
-            if (height == null) {
-              height = itemSize;
-            } else {
-              height = parsePercent$1(height, viewHeight);
-
-              if (sort === 'ascending') {
-                height = -height;
-              }
-            }
-
-            var start = getLinePoints(idx, y);
-            var end = getLinePoints(nextIdx, y + height);
+            var height = getPieceHeight(itemModel.get(['itemStyle', 'height']), idx);
+            setLayoutPoints(i, idx, nextIdx, height, y);
             y += height + gap;
-            data.setItemLayout(idx, {
-              points: start.concat(end.slice().reverse())
-            });
           }
         }
 
         labelLayout(data);
+
+        if (showRate && !dynamicHeight && sort !== 'none') {
+          rateLabelLayout(data);
+        }
       });
     }
 
@@ -65619,6 +66095,14 @@
 
           }
 
+          setLabelStyle(curve, getLabelStatesModels(edgeModel, 'edgeLabel'), {
+            labelFetcher: seriesModel,
+            labelDataIndex: edge.dataIndex,
+            defaultText: "" + edgeModel.get('value')
+          });
+          curve.setTextConfig({
+            position: 'inside'
+          });
           var emphasisModel = edgeModel.getModel('emphasis');
           setStatesStylesFromModel(curve, edgeModel, 'lineStyle', function (model) {
             return model.getItemStyle();
@@ -65884,6 +66368,10 @@
           position: 'right',
           fontSize: 12
         },
+        edgeLabel: {
+          show: false,
+          fontSize: 12
+        },
         levels: [],
         nodeAlign: 'justify',
         lineStyle: {
@@ -65976,7 +66464,7 @@
       // the value is 0, otherwise it is 1.
       var remainEdges = []; // Storage each node's indegree.
 
-      var indegreeArr = []; //Used to storage the node with indegree is equal to 0.
+      var indegreeArr = []; // Used to storage the node with indegree is equal to 0.
 
       var zeroIndegrees = [];
       var nextTargetNode = [];
@@ -66425,6 +66913,7 @@
       ecModel.eachSeriesByType('sankey', function (seriesModel) {
         var graph = seriesModel.getGraph();
         var nodes = graph.nodes;
+        var edges = graph.edges;
 
         if (nodes.length) {
           var minValue_1 = Infinity;
@@ -66461,6 +66950,13 @@
                 fill: mapValueToColor
               });
             }
+          });
+        }
+
+        if (edges.length) {
+          each(edges, function (edge) {
+            var edgeStyle = edge.getModel().get('lineStyle');
+            edge.setVisual('style', edgeStyle);
           });
         }
       });
@@ -66807,50 +67303,6 @@
       });
     }
 
-    /*
-    * Licensed to the Apache Software Foundation (ASF) under one
-    * or more contributor license agreements.  See the NOTICE file
-    * distributed with this work for additional information
-    * regarding copyright ownership.  The ASF licenses this file
-    * to you under the Apache License, Version 2.0 (the
-    * "License"); you may not use this file except in compliance
-    * with the License.  You may obtain a copy of the License at
-    *
-    *   http://www.apache.org/licenses/LICENSE-2.0
-    *
-    * Unless required by applicable law or agreed to in writing,
-    * software distributed under the License is distributed on an
-    * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-    * KIND, either express or implied.  See the License for the
-    * specific language governing permissions and limitations
-    * under the License.
-    */
-
-
-    /**
-     * AUTO-GENERATED FILE. DO NOT MODIFY.
-     */
-
-    /*
-    * Licensed to the Apache Software Foundation (ASF) under one
-    * or more contributor license agreements.  See the NOTICE file
-    * distributed with this work for additional information
-    * regarding copyright ownership.  The ASF licenses this file
-    * to you under the Apache License, Version 2.0 (the
-    * "License"); you may not use this file except in compliance
-    * with the License.  You may obtain a copy of the License at
-    *
-    *   http://www.apache.org/licenses/LICENSE-2.0
-    *
-    * Unless required by applicable law or agreed to in writing,
-    * software distributed under the License is distributed on an
-    * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
-    * KIND, either express or implied.  See the License for the
-    * specific language governing permissions and limitations
-    * under the License.
-    */
-    function boxplotVisual(ecModel, api) {}
-
     var each$6 = each;
     function boxplotLayout(ecModel) {
       var groupResult = groupSeriesByAxis(ecModel);
@@ -67093,7 +67545,6 @@
     function install$j(registers) {
       registers.registerSeriesModel(BoxplotSeriesModel);
       registers.registerChartView(BoxplotView);
-      registers.registerVisual(boxplotVisual);
       registers.registerLayout(boxplotLayout);
       registers.registerTransform(boxplotTransform);
     }
@@ -67410,8 +67861,17 @@
         ignoreCoarsePointer: true
       });
       group.add(elN);
+      var elDoji = new LargeBoxPath({
+        shape: {
+          points: largePoints
+        },
+        __sign: 0,
+        ignoreCoarsePointer: true
+      });
+      group.add(elDoji);
       setLargeStyle(1, elP, seriesModel);
       setLargeStyle(-1, elN, seriesModel);
+      setLargeStyle(0, elDoji, seriesModel);
 
       if (incremental) {
         elP.incremental = true;
@@ -67425,8 +67885,14 @@
 
     function setLargeStyle(sign, el, seriesModel, data) {
       // TODO put in visual?
-      var borderColor = seriesModel.get(['itemStyle', sign > 0 ? 'borderColor' : 'borderColor0']) || seriesModel.get(['itemStyle', sign > 0 ? 'color' : 'color0']); // Color must be excluded.
+      var borderColor = seriesModel.get(['itemStyle', sign > 0 ? 'borderColor' : 'borderColor0']) // Use color for border color by default.
+      || seriesModel.get(['itemStyle', sign > 0 ? 'color' : 'color0']);
+
+      if (sign === 0) {
+        borderColor = seriesModel.get(['itemStyle', 'borderColorDoji']);
+      } // Color must be excluded.
       // Because symbol provide setColor individually to set fill and stroke
+
 
       var itemStyle = seriesModel.getModel('itemStyle').getItemStyle(SKIP_PROPS);
       el.useStyle(itemStyle);
@@ -67489,6 +67955,7 @@
           color0: '#47b262',
           borderColor: '#eb5454',
           borderColor0: '#47b262',
+          borderColorDoji: null,
           // borderColor: '#d24040',
           // borderColor0: '#398f4f',
           borderWidth: 1
@@ -67530,6 +67997,7 @@
 
     var positiveBorderColorQuery = ['itemStyle', 'borderColor'];
     var negativeBorderColorQuery = ['itemStyle', 'borderColor0'];
+    var dojiBorderColorQuery = ['itemStyle', 'borderColorDoji'];
     var positiveColorQuery = ['itemStyle', 'color'];
     var negativeColorQuery = ['itemStyle', 'color0'];
     var candlestickVisual = {
@@ -67543,7 +68011,7 @@
         }
 
         function getBorderColor(sign, model) {
-          return model.get(sign > 0 ? positiveBorderColorQuery : negativeBorderColorQuery);
+          return model.get(sign === 0 ? dojiBorderColorQuery : sign > 0 ? positiveBorderColorQuery : negativeBorderColorQuery);
         } // Only visible series has each data be visual encoded
 
 
@@ -67620,8 +68088,10 @@
             addBodyEnd(ends, ocHighPoint, 0);
             addBodyEnd(ends, ocLowPoint, 1);
             ends.push(subPixelOptimizePoint(highestPoint), subPixelOptimizePoint(ocHighPoint), subPixelOptimizePoint(lowestPoint), subPixelOptimizePoint(ocLowPoint));
+            var itemModel = data.getItemModel(dataIndex);
+            var hasDojiColor = !!itemModel.get(['itemStyle', 'borderColorDoji']);
             data.setItemLayout(dataIndex, {
-              sign: getSign(store, dataIndex, openVal, closeVal, closeDimI),
+              sign: getSign(store, dataIndex, openVal, closeVal, closeDimI, hasDojiColor),
               initBaseline: openVal > closeVal ? ocHighPoint[vDimIdx] : ocLowPoint[vDimIdx],
               ends: ends,
               brushRect: makeBrushRect(lowestVal, highestVal, axisDimVal)
@@ -67671,6 +68141,7 @@
           var tmpOut = [];
           var dataIndex;
           var store = data.getStore();
+          var hasDojiColor = !!seriesModel.get(['itemStyle', 'borderColorDoji']);
 
           while ((dataIndex = params.next()) != null) {
             var axisDimVal = store.get(cDimI, dataIndex);
@@ -67685,7 +68156,7 @@
               continue;
             }
 
-            points[offset++] = getSign(store, dataIndex, openVal, closeVal, closeDimI);
+            points[offset++] = getSign(store, dataIndex, openVal, closeVal, closeDimI, hasDojiColor);
             tmpIn[cDimIdx] = axisDimVal;
             tmpIn[vDimIdx] = lowestVal;
             point = coordSys.dataToPoint(tmpIn, null, tmpOut);
@@ -67700,8 +68171,15 @@
         }
       }
     };
+    /**
+     * Get the sign of a single data.
+     *
+     * @returns 0 for doji with hasDojiColor: true,
+     *          1 for positive,
+     *          -1 for negative.
+     */
 
-    function getSign(store, dataIndex, openVal, closeVal, closeDimI) {
+    function getSign(store, dataIndex, openVal, closeVal, closeDimI, hasDojiColor) {
       var sign;
 
       if (openVal > closeVal) {
@@ -67709,7 +68187,8 @@
       } else if (openVal < closeVal) {
         sign = 1;
       } else {
-        sign = dataIndex > 0 // If close === open, compare with close of last record
+        sign = hasDojiColor // When doji color is set, use it instead of color/color0.
+        ? 0 : dataIndex > 0 // If close === open, compare with close of last record
         ? store.get(closeDimI, dataIndex - 1) <= closeVal ? 1 : -1 : // No record of previous, set to be positive
         1;
       }
@@ -69188,7 +69667,7 @@
           var CoordSys = CoordinateSystemManager.get(option.coordinateSystem);
 
           if (!CoordSys) {
-            throw new Error('Unkown coordinate system ' + option.coordinateSystem);
+            throw new Error('Unknown coordinate system ' + option.coordinateSystem);
           }
         }
 
@@ -72794,12 +73273,12 @@
       if (!el) {
         return;
       } // If el is remove from zr by reason like legend, during still need to called,
-      // becuase el will be added back to zr and the prop value should not be incorrect.
+      // because el will be added back to zr and the prop value should not be incorrect.
 
 
       var latestUserDuring = transitionInnerStore(el).userDuring;
       var scopeUserDuring = scope.userDuring; // Ensured a during is only called once in each animation frame.
-      // If a during is called multiple times in one frame, maybe some users' calulation logic
+      // If a during is called multiple times in one frame, maybe some users' calculation logic
       // might be wrong (not sure whether this usage exists).
       // The case of a during might be called twice can be: by default there is a animator for
       // 'x', 'y' when init. Before the init animation finished, call `setOption` to start
@@ -76584,7 +77063,7 @@
         var valueDim = data.mapDimension(valueAxis.dim);
         var baseDim = data.mapDimension(baseAxis.dim);
         var stacked = isDimensionStacked(data, valueDim
-        /*, baseDim*/
+        /* , baseDim */
         );
         var clampLayout = baseAxis.dim !== 'radius' || !seriesModel.get('roundCap', true);
         var valueAxisStart = valueAxis.dataToCoord(0);
@@ -79248,7 +79727,7 @@
       };
 
       DataZoomModel.prototype.mergeOption = function (newOption) {
-        var inputRawOption = retrieveRawOption(newOption); //FIX #2591
+        var inputRawOption = retrieveRawOption(newOption); // FIX #2591
 
         merge(this.option, newOption, true);
         merge(this.settledOption, inputRawOption, true);
@@ -85330,7 +85809,7 @@
         var data = timelineModel.getData(); // Show all ticks, despite ignoring strategy.
 
         var ticks = axis.scale.getTicks();
-        this._tickSymbols = []; // The value is dataIndex, see the costomized scale.
+        this._tickSymbols = []; // The value is dataIndex, see the customized scale.
 
         each(ticks, function (tick) {
           var tickCoord = axis.dataToCoord(tick.value);
@@ -85373,7 +85852,7 @@
         var labels = axis.getViewLabels();
         this._tickLabels = [];
         each(labels, function (labelItem) {
-          // The tickValue is dataIndex, see the costomized scale.
+          // The tickValue is dataIndex, see the customized scale.
           var dataIndex = labelItem.tickValue;
           var itemModel = data.getItemModel(dataIndex);
           var normalLabelModel = itemModel.getModel('label');
@@ -85487,9 +85966,12 @@
 
         this._currentPointer.markRedraw();
 
-        this._progressLine.shape.x2 = toCoord;
+        var progressLine = this._progressLine;
 
-        this._progressLine.dirty();
+        if (progressLine) {
+          progressLine.shape.x2 = toCoord;
+          progressLine.dirty();
+        }
 
         var targetDataIndex = this._findNearestTick(toCoord);
 
@@ -86031,8 +86513,8 @@
         z: 5,
         symbol: 'pin',
         symbolSize: 50,
-        //symbolRotate: 0,
-        //symbolOffset: [0, 0]
+        // symbolRotate: 0,
+        // symbolOffset: [0, 0]
         tooltip: {
           trigger: 'item'
         },
@@ -86063,7 +86545,7 @@
     function markerTypeCalculatorWithExtent(markerType, data, otherDataDim, targetDataDim, otherCoordIndex, targetCoordIndex) {
       var coordArr = [];
       var stacked = isDimensionStacked(data, targetDataDim
-      /*, otherDataDim*/
+      /* , otherDataDim */
       );
       var calcDataDim = stacked ? data.getCalculationInfo('stackResultDimension') : targetDataDim;
       var value = numCalculate(data, calcDataDim, markerType);
@@ -86453,7 +86935,7 @@
         z: 5,
         symbol: ['circle', 'arrow'],
         symbolSize: [8, 16],
-        //symbolRotate: 0,
+        // symbolRotate: 0,
         symbolOffset: 0,
         precision: 2,
         tooltip: {
@@ -86942,11 +87424,11 @@
         // }
         if (fromCoord && toCoord && (ifMarkAreaHasOnlyDim(1, fromCoord, toCoord) || ifMarkAreaHasOnlyDim(0, fromCoord, toCoord))) {
           return true;
-        } //Directly returning true may also do the work,
-        //because markArea will not be shown automatically
-        //when it's not included in coordinate system.
-        //But filtering ahead can avoid keeping rendering markArea
-        //when there are too many of them.
+        } // Directly returning true may also do the work,
+        // because markArea will not be shown automatically
+        // when it's not included in coordinate system.
+        // But filtering ahead can avoid keeping rendering markArea
+        // when there are too many of them.
 
 
         return zoneFilter(coordSys, item0, item1);
@@ -86968,8 +87450,28 @@
       } else {
         // Chart like bar may have there own marker positioning logic
         if (seriesModel.getMarkerPosition) {
-          // Use the getMarkerPosition
-          point = seriesModel.getMarkerPosition(data.getValues(dims, idx));
+          // Consider the case that user input the right-bottom point first
+          // Pick the larger x and y as 'x1' and 'y1'
+          var pointValue0 = data.getValues(['x0', 'y0'], idx);
+          var pointValue1 = data.getValues(['x1', 'y1'], idx);
+          var clampPointValue0 = coordSys.clampData(pointValue0);
+          var clampPointValue1 = coordSys.clampData(pointValue1);
+          var pointValue = [];
+
+          if (dims[0] === 'x0') {
+            pointValue[0] = clampPointValue0[0] > clampPointValue1[0] ? pointValue1[0] : pointValue0[0];
+          } else {
+            pointValue[0] = clampPointValue0[0] > clampPointValue1[0] ? pointValue0[0] : pointValue1[0];
+          }
+
+          if (dims[1] === 'y0') {
+            pointValue[1] = clampPointValue0[1] > clampPointValue1[1] ? pointValue1[1] : pointValue0[1];
+          } else {
+            pointValue[1] = clampPointValue0[1] > clampPointValue1[1] ? pointValue0[1] : pointValue1[1];
+          } // Use the getMarkerPoisition
+
+
+          point = seriesModel.getMarkerPosition(pointValue, dims, true);
         } else {
           var x = data.get(dims[0], idx);
           var y = data.get(dims[1], idx);
@@ -87343,6 +87845,7 @@
         // which is convinient for user preparing option.
 
         var rawData = this.get('data') || potentialData;
+        var legendNameMap = createHashMap();
         var legendData = map(rawData, function (dataItem) {
           // Can be string or number
           if (isString(dataItem) || isNumber(dataItem)) {
@@ -87351,6 +87854,12 @@
             };
           }
 
+          if (legendNameMap.get(dataItem.name)) {
+            // remove legend name duplicate
+            return null;
+          }
+
+          legendNameMap.set(dataItem.name, true);
           return new Model(dataItem, this, this.ecModel);
         }, this);
         /**
@@ -87358,7 +87867,9 @@
          * @private
          */
 
-        this._data = legendData;
+        this._data = filter(legendData, function (item) {
+          return !!item;
+        });
       };
 
       LegendModel.prototype.getData = function () {
@@ -87846,7 +88357,7 @@
             selectorPos[orientIdx] += contentRect[wh] + selectorButtonGap;
           } else {
             contentPos[orientIdx] += selectorRect[wh] + selectorButtonGap;
-          } //Always align selector to content as 'middle'
+          } // Always align selector to content as 'middle'
 
 
           selectorPos[1 - orientIdx] += contentRect[hw] / 2 - selectorRect[hw] / 2;
@@ -88885,7 +89396,7 @@
         var apiInner = inner$k(api);
         var coordSysRecordMap = apiInner.coordSysRecordMap || (apiInner.coordSysRecordMap = createHashMap());
         coordSysRecordMap.each(function (coordSysRecord) {
-          // `coordSysRecordMap` always exists (becuase it hold the `roam controller`, which should
+          // `coordSysRecordMap` always exists (because it holds the `roam controller`, which should
           // better not re-create each time), but clear `dataZoomInfoMap` each round of the workflow.
           coordSysRecord.dataZoomInfoMap = null;
         });
@@ -92609,7 +93120,7 @@
 
         if (useDecal) {
           // Each type of series use one scope.
-          // Pie and funnel are using diferrent scopes
+          // Pie and funnel are using different scopes.
           var paletteScopeGroupByType_1 = createHashMap();
           ecModel.eachSeries(function (seriesModel) {
             if (seriesModel.isColorBySeries()) {
@@ -94630,24 +95141,72 @@
     }
 
     var DATA_COUNT_THRESHOLD = 1e4;
+    var TRANSITION_NONE = 0;
+    var TRANSITION_P2C = 1;
+    var TRANSITION_C2P = 2;
     var getUniversalTransitionGlobalStore = makeInner();
 
-    function getGroupIdDimension(data) {
+    function getDimension(data, visualDimension) {
       var dimensions = data.dimensions;
 
       for (var i = 0; i < dimensions.length; i++) {
         var dimInfo = data.getDimensionInfo(dimensions[i]);
 
-        if (dimInfo && dimInfo.otherDims.itemGroupId === 0) {
+        if (dimInfo && dimInfo.otherDims[visualDimension] === 0) {
           return dimensions[i];
         }
       }
+    } // get value by dimension. (only get value of itemGroupId or childGroupId, so convert it to string)
+
+
+    function getValueByDimension(data, dataIndex, dimension) {
+      var dimInfo = data.getDimensionInfo(dimension);
+      var dimOrdinalMeta = dimInfo && dimInfo.ordinalMeta;
+
+      if (dimInfo) {
+        var value = data.get(dimInfo.name, dataIndex);
+
+        if (dimOrdinalMeta) {
+          return dimOrdinalMeta.categories[value] || value + '';
+        }
+
+        return value + '';
+      }
     }
+
+    function getGroupId(data, dataIndex, dataGroupId, isChild) {
+      // try to get groupId from encode
+      var visualDimension = isChild ? 'itemChildGroupId' : 'itemGroupId';
+      var groupIdDim = getDimension(data, visualDimension);
+
+      if (groupIdDim) {
+        var groupId = getValueByDimension(data, dataIndex, groupIdDim);
+        return groupId;
+      } // try to get groupId from raw data item
+
+
+      var rawDataItem = data.getRawDataItem(dataIndex);
+      var property = isChild ? 'childGroupId' : 'groupId';
+
+      if (rawDataItem && rawDataItem[property]) {
+        return rawDataItem[property] + '';
+      } // fallback
+
+
+      if (isChild) {
+        return;
+      } // try to use series.dataGroupId as groupId, otherwise use dataItem's id as groupId
+
+
+      return dataGroupId || data.getId(dataIndex);
+    } // flatten all data items from different serieses into one arrary
+
 
     function flattenDataDiffItems(list) {
       var items = [];
       each(list, function (seriesInfo) {
         var data = seriesInfo.data;
+        var dataGroupId = seriesInfo.dataGroupId;
 
         if (data.count() > DATA_COUNT_THRESHOLD) {
           if ("development" !== 'production') {
@@ -94658,12 +95217,12 @@
         }
 
         var indices = data.getIndices();
-        var groupDim = getGroupIdDimension(data);
 
         for (var dataIndex = 0; dataIndex < indices.length; dataIndex++) {
           items.push({
             data: data,
-            dim: seriesInfo.dim || groupDim,
+            groupId: getGroupId(data, dataIndex, dataGroupId, false),
+            childGroupId: getGroupId(data, dataIndex, dataGroupId, true),
             divide: seriesInfo.divide,
             dataIndex: dataIndex
           });
@@ -94756,17 +95315,72 @@
         }
       }
 
-      function findKeyDim(items) {
-        for (var i = 0; i < items.length; i++) {
-          if (items[i].dim) {
-            return items[i].dim;
-          }
+      var hasMorphAnimation = false;
+      /**
+       * With groupId and childGroupId, we can build parent-child relationships between dataItems.
+       * However, we should mind the parent-child "direction" between old and new options.
+       *
+       * For example, suppose we have two dataItems from two series.data:
+       *
+       * dataA: [                          dataB: [
+       *   {                                 {
+       *     value: 5,                         value: 3,
+       *     groupId: 'creatures',             groupId: 'animals',
+       *     childGroupId: 'animals'           childGroupId: 'dogs'
+       *   },                                },
+       *   ...                               ...
+       * ]                                 ]
+       *
+       * where dataA is belong to optionA and dataB is belong to optionB.
+       *
+       * When we `setOption(optionB)` from optionA, we choose childGroupId of dataItemA and groupId of
+       * dataItemB as keys so the two keys are matched (both are 'animals'), then universalTransition
+       * will work. This derection is "parent -> child".
+       *
+       * If we `setOption(optionA)` from optionB, we also choose groupId of dataItemB and childGroupId
+       * of dataItemA as keys and universalTransition will work. This derection is "child -> parent".
+       *
+       * If there is no childGroupId specified, which means no multiLevelDrillDown/Up is needed and no
+       * parent-child relationship exists. This direction is "none".
+       *
+       * So we need to know whether to use groupId or childGroupId as the key when we call the keyGetter
+       * functions. Thus, we need to decide the direction first.
+       *
+       * The rule is:
+       *
+       * if (all childGroupIds in oldDiffItems and all groupIds in newDiffItems have common value) {
+       *   direction = 'parent -> child';
+       * } else if (all groupIds in oldDiffItems and all childGroupIds in newDiffItems have common value) {
+       *   direction = 'child -> parent';
+       * } else {
+       *   direction = 'none';
+       * }
+       */
+
+      var direction = TRANSITION_NONE; // find all groupIds and childGroupIds from oldDiffItems
+
+      var oldGroupIds = createHashMap();
+      var oldChildGroupIds = createHashMap();
+      oldDiffItems.forEach(function (item) {
+        item.groupId && oldGroupIds.set(item.groupId, true);
+        item.childGroupId && oldChildGroupIds.set(item.childGroupId, true);
+      }); // traverse newDiffItems and decide the direction according to the rule
+
+      for (var i = 0; i < newDiffItems.length; i++) {
+        var newGroupId = newDiffItems[i].groupId;
+
+        if (oldChildGroupIds.get(newGroupId)) {
+          direction = TRANSITION_P2C;
+          break;
+        }
+
+        var newChildGroupId = newDiffItems[i].childGroupId;
+
+        if (newChildGroupId && oldGroupIds.get(newChildGroupId)) {
+          direction = TRANSITION_C2P;
+          break;
         }
       }
-
-      var oldKeyDim = findKeyDim(oldDiffItems);
-      var newKeyDim = findKeyDim(newDiffItems);
-      var hasMorphAnimation = false;
 
       function createKeyGetter(isOld, onlyGetId) {
         return function (diffItem) {
@@ -94775,37 +95389,13 @@
 
           if (onlyGetId) {
             return data.getId(dataIndex);
-          } // Use group id as transition key by default.
-          // So we can achieve multiple to multiple animation like drilldown / up naturally.
-          // If group id not exits. Use id instead. If so, only one to one transition will be applied.
-
-
-          var dataGroupId = data.hostModel && data.hostModel.get('dataGroupId'); // If specified key dimension(itemGroupId by default). Use this same dimension from other data.
-          // PENDING: If only use key dimension of newData.
-
-          var keyDim = isOld ? oldKeyDim || newKeyDim : newKeyDim || oldKeyDim;
-          var dimInfo = keyDim && data.getDimensionInfo(keyDim);
-          var dimOrdinalMeta = dimInfo && dimInfo.ordinalMeta;
-
-          if (dimInfo) {
-            // Get from encode.itemGroupId.
-            var key = data.get(dimInfo.name, dataIndex);
-
-            if (dimOrdinalMeta) {
-              return dimOrdinalMeta.categories[key] || key + '';
-            }
-
-            return key + '';
-          } // Get groupId from raw item. { groupId: '' }
-
-
-          var itemVal = data.getRawDataItem(dataIndex);
-
-          if (itemVal && itemVal.groupId) {
-            return itemVal.groupId + '';
           }
 
-          return dataGroupId || data.getId(dataIndex);
+          if (isOld) {
+            return direction === TRANSITION_P2C ? diffItem.childGroupId : diffItem.groupId;
+          } else {
+            return direction === TRANSITION_C2P ? diffItem.childGroupId : diffItem.groupId;
+          }
         };
       } // Use id if it's very likely to be an one to one animation
       // It's more robust than groupId
@@ -94997,17 +95587,22 @@
 
       var oldDataMapForSplit = createHashMap();
       each(globalStore.oldSeries, function (series, idx) {
+        var oldDataGroupId = globalStore.oldDataGroupIds[idx];
         var oldData = globalStore.oldData[idx];
         var transitionKey = getSeriesTransitionKey(series);
         var transitionKeyStr = convertArraySeriesKeyToString(transitionKey);
-        oldDataMap.set(transitionKeyStr, oldData);
+        oldDataMap.set(transitionKeyStr, {
+          dataGroupId: oldDataGroupId,
+          data: oldData
+        });
 
         if (isArray(transitionKey)) {
           // Same key can't in different array seriesKey.
           each(transitionKey, function (key) {
             oldDataMapForSplit.set(key, {
-              data: oldData,
-              key: transitionKeyStr
+              key: transitionKeyStr,
+              dataGroupId: oldDataGroupId,
+              data: oldData
             });
           });
         }
@@ -95021,6 +95616,7 @@
 
       each(params.updatedSeries, function (series) {
         if (series.isUniversalTransitionEnabled() && series.isAnimationEnabled()) {
+          var newDataGroupId = series.get('dataGroupId');
           var newData = series.getData();
           var transitionKey = getSeriesTransitionKey(series);
           var transitionKeyStr = convertArraySeriesKeyToString(transitionKey); // Only transition between series with same id.
@@ -95035,16 +95631,19 @@
 
             updateBatches.set(transitionKeyStr, {
               oldSeries: [{
-                divide: getDivideShapeFromData(oldData),
-                data: oldData
+                dataGroupId: oldData.dataGroupId,
+                divide: getDivideShapeFromData(oldData.data),
+                data: oldData.data
               }],
               newSeries: [{
+                dataGroupId: newDataGroupId,
                 divide: getDivideShapeFromData(newData),
                 data: newData
               }]
             });
           } else {
             // Transition from multiple series.
+            // e.g. 'female', 'male' -> ['female', 'male']
             if (isArray(transitionKey)) {
               if ("development" !== 'production') {
                 checkTransitionSeriesKeyDuplicated(transitionKeyStr);
@@ -95054,10 +95653,11 @@
               each(transitionKey, function (key) {
                 var oldData = oldDataMap.get(key);
 
-                if (oldData) {
+                if (oldData.data) {
                   oldSeries_1.push({
-                    divide: getDivideShapeFromData(oldData),
-                    data: oldData
+                    dataGroupId: oldData.dataGroupId,
+                    divide: getDivideShapeFromData(oldData.data),
+                    data: oldData.data
                   });
                 }
               });
@@ -95066,6 +95666,7 @@
                 updateBatches.set(transitionKeyStr, {
                   oldSeries: oldSeries_1,
                   newSeries: [{
+                    dataGroupId: newDataGroupId,
                     data: newData,
                     divide: getDivideShapeFromData(newData)
                   }]
@@ -95073,6 +95674,7 @@
               }
             } else {
               // Try transition to multiple series.
+              // e.g. ['female', 'male'] -> 'female', 'male'
               var oldData_1 = oldDataMapForSplit.get(transitionKey);
 
               if (oldData_1) {
@@ -95081,6 +95683,7 @@
                 if (!batch) {
                   batch = {
                     oldSeries: [{
+                      dataGroupId: oldData_1.dataGroupId,
                       data: oldData_1.data,
                       divide: getDivideShapeFromData(oldData_1.data)
                     }],
@@ -95090,6 +95693,7 @@
                 }
 
                 batch.newSeries.push({
+                  dataGroupId: newDataGroupId,
                   data: newData,
                   divide: getDivideShapeFromData(newData)
                 });
@@ -95119,10 +95723,11 @@
 
         if (idx >= 0) {
           from.push({
+            dataGroupId: globalStore.oldDataGroupIds[idx],
             data: globalStore.oldData[idx],
             // TODO can specify divideShape in transition.
             divide: getDivideShapeFromData(globalStore.oldData[idx]),
-            dim: finder.dimension
+            groupIdDim: finder.dimension
           });
         }
       });
@@ -95132,9 +95737,10 @@
         if (idx >= 0) {
           var data = params.updatedSeries[idx].getData();
           to.push({
+            dataGroupId: globalStore.oldDataGroupIds[idx],
             data: data,
             divide: getDivideShapeFromData(data),
-            dim: finder.dimension
+            groupIdDim: finder.dimension
           });
         }
       });
@@ -95163,6 +95769,7 @@
         var globalStore = getUniversalTransitionGlobalStore(api); // TODO multiple to multiple series.
 
         if (globalStore.oldSeries && params.updatedSeries && params.optionChanged) {
+          // TODO transitionOpt was used in an old implementation and can be removed now
           // Use give transition config if its' give;
           var transitionOpt = params.seriesTransition;
 
@@ -95191,6 +95798,7 @@
 
         var allSeries = ecModel.getSeries();
         var savedSeries = globalStore.oldSeries = [];
+        var savedDataGroupIds = globalStore.oldDataGroupIds = [];
         var savedData = globalStore.oldData = [];
 
         for (var i = 0; i < allSeries.length; i++) {
@@ -95199,6 +95807,7 @@
 
           if (data.count() < DATA_COUNT_THRESHOLD) {
             savedSeries.push(allSeries[i]);
+            savedDataGroupIds.push(allSeries[i].get('dataGroupId'));
             savedData.push(data);
           }
         }
